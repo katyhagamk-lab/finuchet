@@ -44,6 +44,7 @@ const html = `<!doctype html>
 <script>${read("bankcalc.js")}</script>
 <script>${read("bank.js")}</script>
 <script>${read("grade.js")}</script>
+<script>${read("dayplan.js")}</script>
 <script>${read("app.js")}</script>
 </body></html>`;
 const out = path.join(here, "..", "index.html");

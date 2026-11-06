@@ -25,6 +25,7 @@
   const DEF = () => ({ v: 1, quiz: {}, manual: {}, practice: {}, notes: {}, cards: {}, train: {}, forms: {}, formsDone: {}, examDate: "", mock: { active: null, history: [] }, days: {}, seen: {} });
   let S = DEF(), memoryOnly = false;
   try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(DEF(), JSON.parse(raw)); } catch (e) { memoryOnly = true; }
+  if (!S.examDate && window.DAYPLAN) S.examDate = window.DAYPLAN.exam;
   const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { memoryOnly = true; } };
   const save = () => { saveLocal(); queuePush(); };
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
@@ -308,9 +309,62 @@
   }
   const nextStep = () => planItems().find((i) => i.state !== "done") || null;
 
+  /* ---------- План по дням до контрольной (src/dayplan.js) ---------- */
+  const DP = window.DAYPLAN || null;
+  const localDay = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const dpActive = () => !!(DP && localDay() <= DP.exam);
+  const dpDate = (s, o) => new Date(s + "T12:00:00").toLocaleDateString("ru-RU", o);
+  const DP_KIND = { lesson: "Урок", exam: "Контрольная", bank: "Банк", train: "Тренажёр", case: "Тренажёр", variant: "Вариант", mistakes: "Ошибки", open: "Своими словами", notes: "Спорные места", cheat: "Шпаргалка", cards: "Карточки", reports: "Бланки", schemes: "Схемы" };
+  const varDone = (v) => S.mock.history.some((r) => r.mode === "var" && r.v === v);
+  function dpItem(d, it, i) {
+    let title = it.title || "", min = it.min || 10, link = "", auto = null, hint = "", key = `dp.${d.date}.${i}`;
+    const cnt = (s, need) => { hint = `${Math.min(s, need)} из ${need}`; return s >= need ? "done" : s ? "part" : "new"; };
+    if (it.t === "lesson") { const l = LMAP[it.id]; title = l ? l.title : it.id; min = (l && l.minutes) || 12; link = `l/${it.id}`; auto = l ? lessonState(l) : "new"; key = it.id; }
+    else if (it.t === "exam") { link = `exam/${it.ns[0]}`; auto = cnt(it.ns.filter((n) => isOk(`exam.${n}`)).length, it.ns.length); }
+    else if (it.t === "bank") { link = `bank/${it.n}`; auto = cnt(bankDone(it.n), it.count); }
+    else if (it.t === "train" || it.t === "case") { const id = it.id || "case"; link = `train/${id}`; auto = cnt((S.train[id] || {}).ok || 0, it.count || 1); }
+    else if (it.t === "variant") { link = `v/${it.v}`; auto = varDone(it.v) ? "done" : "new"; }
+    else if (it.t === "open") { link = "bank/open"; auto = cnt(OPENQ.filter((o) => isOk(`open.${o.id}`)).length, it.count || 10); }
+    else if (it.t === "reports") { link = "reports"; auto = S.formsDone.base ? "done" : "new"; }
+    else if (it.t === "mistakes") { link = "mistakes"; const v = d.items.find((x) => x.t === "variant"); if (v && varDone(v.v) && !mistakes().length) auto = "done"; }
+    else link = { notes: "notes", cheat: "cheat", cards: "cards", schemes: "schemes" }[it.t] || "";
+    const man = !!S.manual[key], state = man || auto === "done" ? "done" : auto === "part" ? "part" : "new";
+    return { key, title, min, link, state, man, auto, hint, kind: DP_KIND[it.t] || "", date: d.date, l: it.t === "lesson" ? LMAP[it.id] : null, schemes: it.t === "schemes" ? (it.ids || []).map((id) => SCHEMES.find((x) => x.id === id)).filter(Boolean) : null };
+  }
+  const dpItems = (d) => d.items.map((it, i) => dpItem(d, it, i));
+  const dpLeftMin = (list) => list.filter((x) => x.state !== "done").reduce((a, x) => a + x.min, 0);
+  const hrs = (m) => `${String(Math.round(m / 6) / 10).replace(".", ",")} ч`;
+  function dpToday() { const t = localDay(); return DP.days.find((d) => d.date === t) || DP.days.find((d) => d.date > t) || DP.days[DP.days.length - 1]; }
+  const dpBehind = (upTo) => DP.days.filter((d) => d.date < upTo).flatMap((d) => dpItems(d).filter((x) => x.state !== "done"));
+  function dpNext() { if (!dpActive()) return null; const d = dpToday(), list = [...dpBehind(d.date), ...dpItems(d)]; return list.find((x) => x.state !== "done") || null; }
+  const planTabs = (cur) => (DP ? `<div class="chips no-print" style="margin-bottom:16px"><a class="chip ${cur === "days" ? "on" : ""}" href="#/plan">По дням до ${esc(dpDate(DP.exam, { day: "numeric", month: "long" }))}</a><a class="chip ${cur === "auto" ? "on" : ""}" href="#/plan/auto">Свой маршрут по дате</a></div>` : "");
+  const dpRow = (x, behind) => `<div class="dp-item ${x.state}"><button class="dp-check" data-act="dp-tick" data-key="${esc(x.key)}" aria-pressed="${x.state === "done"}" ${x.auto === "done" && !x.man ? `disabled title="Отмечено само: задания решены"` : ""} aria-label="${x.state === "done" ? "Снять отметку" : "Отметить сделанным"}: ${esc(x.title)}">${ICON.check}</button><a class="dp-main" href="#/${x.link}"><span class="dp-title">${esc(x.title)}</span><span class="dp-meta"><span class="tag">${esc(x.kind)}</span>${behind ? `<span class="tag bad">с ${esc(dpDate(x.date, { day: "numeric", month: "long" }))}</span>` : ""}${x.hint ? `<span class="tiny muted">${esc(x.hint)}</span>` : ""}</span></a><small class="tiny faint">${x.min} мин</small>${x.schemes && x.schemes.length ? `<div class="dp-thumbs">${x.schemes.map((s) => `<button class="dp-thumb" data-act="zoom" data-id="${s.id}" aria-label="Открыть схему «${esc(s.title)}»"><img loading="lazy" decoding="async" src="${SIMG[s.id]}" alt=""><span>${esc(s.title)}</span></button>`).join("")}</div>` : ""}</div>`;
+  function viewDays(sel) {
+    const t = localDay(), cur = DP.days.find((d) => d.date === sel) || dpToday(), left = daysLeft();
+    const tiles = DP.days.map((d) => {
+      const list = dpItems(d), done = list.filter((x) => x.state === "done").length, isExam = d.date === DP.exam, past = d.date < t;
+      return `<a class="dp-day ${d.date === cur.date ? "on" : ""} ${d.date === t ? "today" : ""} ${isExam ? "exam" : ""} ${done === list.length ? "full" : ""}" href="#/plan/${d.date}" aria-current="${d.date === cur.date ? "date" : "false"}"><span class="dp-wd">${d.date === t ? "Сегодня" : esc(dpDate(d.date, { weekday: "short" }))}</span><span class="dots dp-num">${+d.date.slice(8)}</span>${d.short ? `<span class="dp-ttl">${esc(d.short)}</span>` : ""}<span class="dp-mini" aria-label="Сделано ${done} из ${list.length}">${list.map((x) => `<i class="${x.state}"></i>`).join("")}</span><span class="dp-cap">${isExam ? "Контрольная" : past && done < list.length ? `${list.length - done} не сделано` : hrs(dpLeftMin(list)) === "0 ч" ? "Готово" : hrs(dpLeftMin(list))}</span></a>`;
+    }).join("");
+    const list = dpItems(cur), done = list.filter((x) => x.state === "done").length, total = list.reduce((a, x) => a + x.min, 0);
+    const behind = cur.date >= t ? dpBehind(cur.date > t ? t : cur.date) : [];
+    const allDone = DP.days.every((d) => dpItems(d).every((x) => x.state === "done"));
+    return `${crumbs([["", "Главная"], ["", "План"]])}<div class="pagehead"><div><h1 class="h-xl">План до контрольной</h1><p class="muted" style="margin-top:10px;max-width:62ch">${left != null && left > 0 ? `${plural(left, "Остался", "Осталось", "Осталось")} ${left} ${plural(left, "день", "дня", "дней")}. ` : left === 0 ? "Контрольная сегодня. " : ""}Сначала сквозная задача 18–22, она даёт 5 заданий из 22, потом расчёты, тестовая часть и два варианта на время. Уроки и задания отмечаются сами, когда решишь их; остальное отмечай кружком слева.</p></div></div>
+    ${planTabs("days")}
+    <div class="dp-strip" role="list">${tiles}</div>
+    <section class="dp-card ${cur.date === DP.exam ? "mesh mesh-pink" : "white"}">
+      <div class="dp-head"><div><p class="small ${cur.date === DP.exam ? "" : "muted"}">${esc(dpDate(cur.date, { weekday: "long", day: "numeric", month: "long" }))}</p><h2 class="h-lg" style="margin-top:4px">${esc(cur.title)}</h2></div><div class="dp-score"><span class="dots">${done}</span><span class="tiny">из ${list.length}<br>сделано</span></div></div>
+      <p class="dp-note">${esc(cur.note)}</p>
+      <div class="dp-bar" aria-hidden="true"><b style="width:${list.length ? Math.round((done / list.length) * 100) : 0}%"></b></div>
+      <p class="tiny ${cur.date === DP.exam ? "" : "muted"}" style="margin:8px 0 6px">Всего примерно ${hrs(total)}, осталось ${hrs(dpLeftMin(list))}</p>
+      ${behind.length ? `<div class="dp-behind"><h3 class="h-sm">Не успела раньше</h3><p class="tiny muted" style="margin:2px 0 4px">Начни с этого, если остаётся время. Сквозную задачу и варианты не пропускай.</p>${behind.map((x) => dpRow(x, true)).join("")}</div>` : ""}
+      <div class="dp-list">${list.map((x) => dpRow(x)).join("")}</div>
+    </section>
+    ${allDone ? `<div class="b-note exam" style="margin-top:14px"><b>План пройден</b><span>Если есть время, реши ещё один вариант на время или сквозную задачу с новыми числами.</span></div>` : ""}`;
+  }
+
   /* ---------- Главная ---------- */
   function viewHome() {
-    const ready = readiness(), doneL = LESSONS.filter((l) => lessonState(l) === "done").length, solved = TASKS.filter((t) => isOk(`exam.${t.n}`)).length, errs = mistakes().length, left = daysLeft(), next = nextStep();
+    const ready = readiness(), doneL = LESSONS.filter((l) => lessonState(l) === "done").length, solved = TASKS.filter((t) => isOk(`exam.${t.n}`)).length, errs = mistakes().length, left = daysLeft(), dn = dpNext(), next = dn || nextStep();
     const nextL = next && next.l ? next.l : LESSONS.find((l) => lessonState(l) !== "done");
     const pillPos = LESSONS.length && nextL ? ((nextL.idx + 0.5) / LESSONS.length) * 100 : 50;
     const bars = TASKS.map((t) => { const m = taskMastery(t.n), lv = m >= 0.67 ? "l3" : m >= 0.34 ? "l2" : m > 0 ? "l1" : ""; return `<a href="#/exam/${t.n}" class="${lv}" title="Задание ${t.n}: ${esc(t.topic)}" aria-label="Задание ${t.n}">${"<i></i>".repeat(8)}</a>`; }).join("");
@@ -341,8 +395,8 @@
     <section class="main-grid">
       <div class="mesh mesh-green bigcard"><div class="ttl">Готовность к контрольной</div><div class="bignum dots">${ready}</div><div class="sub">${ready >= 80 ? "Можно идти писать" : ready >= 50 ? "Хороший темп" : ready > 0 ? "Подготовка идёт" : "Реши первое задание"}</div><div class="bars" aria-label="Готовность по 22 заданиям">${bars}</div></div>
       <div class="mesh mesh-orange bigcard"><div class="ttl">Дата контрольной</div><div class="bignum dots">${left == null ? "–" : Math.max(0, left)}</div><div class="sub">${left == null ? "Укажи дату, чтобы разбить план по дням" : plural(Math.max(0, left), "день остался", "дня осталось", "дней осталось")}</div><input type="date" class="date-input" data-inp="examDate" aria-label="Дата контрольной" value="${esc(S.examDate)}"><div class="ruler" aria-hidden="true">${ruler}</div></div>
-      <div class="pending"><h3>${next ? "Что делать дальше" : "Всё по плану пройдено"}</h3><a class="round sm" href="#/plan" style="position:absolute;right:16px;top:16px" aria-label="Весь план">${ICON.next}</a>
-        ${next ? `<div style="display:grid;grid-template-columns:1fr auto;gap:14px;margin-top:14px;flex:1"><div style="display:flex;flex-direction:column"><span class="h-sm">${esc(next.title)}</span><span class="small muted" style="margin-top:4px">примерно ${next.min} минут${next.optional ? ", по желанию" : ""}</span><div class="slider" aria-hidden="true"><b style="width:${ready}%"></b><i style="left:${Math.max(2, ready)}%"></i></div><span class="tiny muted">Шаг ${planItems().filter((i) => i.state === "done").length + 1} из ${planItems().length}</span></div><div style="background:rgba(255,255,255,.72);border-radius:26px;width:88px;display:grid;place-items:center"><div class="blob" style="--c:${next.l ? COLORS[next.l.mod.id] : "#F4802B"}"></div></div></div><a class="pill ink" href="#/${next.link}" style="margin-top:16px">Продолжить</a>` : `<p class="muted" style="margin:14px 0">Прогони ещё одну пробную с новыми числами, чтобы закрепить результат.</p><a class="pill ink" href="#/mock">Новая пробная</a>`}
+      <div class="pending"><h3>${dn ? "Что делать сегодня" : next ? "Что делать дальше" : "Всё по плану пройдено"}</h3><a class="round sm" href="#/plan" style="position:absolute;right:16px;top:16px" aria-label="Весь план">${ICON.next}</a>
+        ${next ? `<div style="display:grid;grid-template-columns:1fr auto;gap:14px;margin-top:14px;flex:1"><div style="display:flex;flex-direction:column"><span class="h-sm">${esc(next.title)}</span><span class="small muted" style="margin-top:4px">примерно ${next.min} минут${next.optional ? ", по желанию" : ""}</span><div class="slider" aria-hidden="true"><b style="width:${ready}%"></b><i style="left:${Math.max(2, ready)}%"></i></div><span class="tiny muted">${dn ? (() => { const d = dpToday(), l = dpItems(d); return dn.date < d.date ? `Хвост с ${dpDate(dn.date, { day: "numeric", month: "long" })}` : `${d.date === localDay() ? "Сегодня" : dpDate(d.date, { day: "numeric", month: "long" })}: сделано ${l.filter((x) => x.state === "done").length} из ${l.length}`; })() : `Шаг ${planItems().filter((i) => i.state === "done").length + 1} из ${planItems().length}`}</span></div><div style="background:rgba(255,255,255,.72);border-radius:26px;width:88px;display:grid;place-items:center"><div class="blob" style="--c:${next.l ? COLORS[next.l.mod.id] : "#F4802B"}"></div></div></div><a class="pill ink" href="#/${next.link}" style="margin-top:16px">Продолжить</a>` : `<p class="muted" style="margin:14px 0">Прогони ещё одну пробную с новыми числами, чтобы закрепить результат.</p><a class="pill ink" href="#/mock">Новая пробная</a>`}
       </div>
     </section>
     <div class="sechead"><div><h2 class="h-lg">Карта контрольной</h2><p class="muted small" style="margin-top:4px">22 задания с разбором. Зелёным отмечены решённые, розовым те, где была ошибка.</p></div><a class="pill" href="#/exam">Все разборы</a></div>
@@ -351,7 +405,7 @@
     <div class="mod-grid">${MODS.map(modCard).join("")}</div>
     <div class="sechead"><h2 class="h-lg">Инструменты</h2></div>
     <div class="tr-grid">
-      ${toolCard("plan", "План подготовки", "Расписание по дням от даты контрольной: сначала то, что даёт больше всего заданий.", "#6E9BE8", "")}
+      ${toolCard("plan", "План подготовки", dpActive() ? `Что делать каждый день до ${dpDate(DP.exam, { day: "numeric", month: "long" })}: уроки, задания контрольной и два варианта на время.` : "Расписание по дням от даты контрольной: сначала то, что даёт больше всего заданий.", "#6E9BE8", dpActive() ? "По дням" : "")}
       ${toolCard("reports", "Собери отчёты сам", "Те же бланки баланса и ОФР, что на контрольной, с проверкой каждой строки.", "#F4802B", "Задания 18–22")}
       ${toolCard("variants", "Варианты контрольной", `${BK.VARIANTS} готовых вариантов на 22 задания: на время, с проверкой или на бумаге.`, "#F0558C", "Как настоящая")}
       ${toolCard("bank", "Банк заданий", `${BK.total} похожих заданий по каждому типу из контрольной с разбором.`, "#3FB568", "")}
@@ -625,8 +679,8 @@
       body = `<div class="plan-day today"><h3>Порядок подготовки<span class="tag">примерно ${Math.round(totalMin / 6) / 10} ч</span></h3>${items.filter((i) => i.state !== "done").map(planRow).join("")}</div>`;
     }
     const fast = S.planMode === "fast", perDay = days ? totalMin / days / 60 : 0;
-    return `${crumbs([["", "Главная"], ["", "План"]])}<div class="pagehead"><div><h1 class="h-xl">План подготовки</h1><p class="muted" style="margin-top:10px;max-width:60ch">Порядок идёт от веса заданий: сначала сквозная задача 18–22, потом расчёты, в конце тестовая часть и пробные.</p></div></div>
-    <div class="chips" style="margin-bottom:12px;align-items:center"><button class="chip ${fast ? "" : "on"}" data-act="plan-mode" data-mode="full">Полный маршрут: все уроки</button><button class="chip ${fast ? "on" : ""}" data-act="plan-mode" data-mode="fast">Короткий: только контрольная и пробные</button></div>
+    return `${crumbs([["", "Главная"], ["", "План"]])}<div class="pagehead"><div><h1 class="h-xl">${dpActive() ? "Свой маршрут" : "План подготовки"}</h1><p class="muted" style="margin-top:10px;max-width:60ch">Порядок идёт от веса заданий: сначала сквозная задача 18–22, потом расчёты, в конце тестовая часть и пробные.</p></div></div>
+    ${dpActive() ? planTabs("auto") : ""}<div class="chips" style="margin-bottom:12px;align-items:center"><button class="chip ${fast ? "" : "on"}" data-act="plan-mode" data-mode="full">Полный маршрут: все уроки</button><button class="chip ${fast ? "on" : ""}" data-act="plan-mode" data-mode="fast">Короткий: только контрольная и пробные</button></div>
     ${!fast && perDay > 5 ? `<div class="b-note exam" style="margin-bottom:14px"><b>Времени мало</b><span>При этой дате полный маршрут требует примерно ${Math.round(perDay)} ч в день. Переключись на короткий: разборы всех 22 заданий, бланки отчётов и две пробные.</span></div>` : ""}
     <div class="glass" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:16px;border-radius:24px"><label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="small">Дата контрольной</span><input type="date" class="num" style="width:auto;padding:7px 12px" data-inp="examDate" value="${esc(S.examDate)}"></label><span class="small muted">Сделано ${done} из ${core.length} шагов</span></div>
     ${left != null && left <= 0 ? `<p class="small muted" style="margin-bottom:12px">Эта дата уже наступила: выбери новую, чтобы разбить план по дням.</p>` : !S.examDate ? `<p class="small muted" style="margin-bottom:12px">Укажи дату, и план разобьётся по дням.</p>` : ""}${body}`;
@@ -802,7 +856,7 @@
     else if (r === "cards") html = viewCards(a || "");
     else if (r === "cheat") html = viewCheat(a || "");
     else if (r === "mistakes") html = viewMistakes();
-    else if (r === "plan") html = viewPlan();
+    else if (r === "plan") html = a === "auto" || !dpActive() ? viewPlan() : viewDays(a);
     else if (r === "notes") html = viewNotes();
     else if (r === "account") html = viewAccount();
     else if (r === "bank") html = a === "open" ? viewOpenBank() : a ? viewBankType(+a) : viewBank();
@@ -929,6 +983,7 @@
     else if (act === "acc-logout") { if (ac.dataset.sure) { push(true); accCode = null; try { localStorage.removeItem(CODE_KEY); } catch (err) {} route(); toast("Вы вышли на этом устройстве"); } else { ac.dataset.sure = "1"; ac.textContent = "Точно выйти"; } }
     else if (act === "inline-sol") { const box = ac.closest(".exam-inline"); $$(".exam-inline-sol", box).forEach((x) => (x.hidden = false)); ac.remove(); }
     else if (act === "print-var") { document.body.classList.toggle("print-key", ac.dataset.key === "1"); window.print(); }
+    else if (act === "dp-tick") { const k = ac.dataset.key; S.manual[k] = !S.manual[k]; if (!S.manual[k]) delete S.manual[k]; bump(); save(); softRerender(); }
     else if (act === "plan-mode") { S.planMode = ac.dataset.mode; save(); route(); }
     else if (act === "form-base") { S.forms.seed = 0; save(); route(); }
     else if (act === "form-new") { S.forms.seed = Math.floor(Math.random() * 1e9) + 1; save(); route(); }
