@@ -2,7 +2,7 @@
    Ключевая идея: { l: "подпись для студента", s: ["основа", "синоним", "=ОНА"] }.
    Основа совпадает с началом слова или фразы ("завыш" ловит «завышать», «не завышаем»),
    основа с «=» совпадает только с целым словом (аббревиатуры: =ндс, =оно),
-   фраза с «не » требует отрицания рядом. Длинные основы прощают одну опечатку. */
+   фраза с «не » требует отрицания рядом, «=» внутри фразы требует целого слова («ооо =10»). Длинные основы прощают одну опечатку. */
 (function (root) {
   const signs = (t) => String(t || "").replace(/≥|>=/g, " не меньше ").replace(/≤|<=/g, " не больше ").replace(/>/g, " больше ").replace(/</g, " меньше ").replace(/≠/g, " не равно ");
   const norm = (t) => " " + signs(t).toLowerCase().replace(/ё/g, "е").replace(/[^a-zа-я0-9%]+/g, " ").replace(/\s+/g, " ").trim() + " ";
@@ -23,7 +23,7 @@
     if (s[0] === "=") { s = s.slice(1); return ws.includes(s); }
     const parts = s.split(" ").filter(Boolean);
     if (parts.length > 1) { // фраза: каждое слово по началу, подряд
-      for (let i = 0; i + parts.length <= ws.length; i++) if (parts.every((p, k) => ws[i + k].startsWith(p) || (p.length >= 6 && lev1(ws[i + k].slice(0, p.length), p)))) return true;
+      for (let i = 0; i + parts.length <= ws.length; i++) if (parts.every((p, k) => (p[0] === "=" ? ws[i + k] === p.slice(1) : ws[i + k].startsWith(p)) || (p.length >= 6 && lev1(ws[i + k].slice(0, p.length), p)))) return true;
       return false;
     }
     if (ws.some((w) => w.startsWith(s))) return true;

@@ -871,6 +871,7 @@
     if (r === "mock" && S.mock.active && a !== "result") startMockClock();
     if (pendingScroll) { const el = document.getElementById(pendingScroll); pendingScroll = null; if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth" }), 30); }
     prevRoute = r;
+    if (aiOn) aiSync();
   }
   let pendingScroll = null;
   const clampN = (a) => { const n = parseInt(a, 10); return n >= 1 && n <= 22 ? n : 1; };
@@ -1036,5 +1037,77 @@
   window.addEventListener("online", () => { if (dirty) push(false); });
   route();
   pull(true).catch(() => {});
-  window.__fu = { OPENQ, sync, acc: () => accCode, S: () => S, LESSONS, QREG, BK, SCHEMES, VZ, LESSON_EXAM };
+  /* ---------- Спросить ИИ: вопрос собирается здесь, ответ в Claude или ChatGPT ---------- */
+  var aiOn = false; // route() вызывается и до этого блока
+  const AI = { sel: "", sec: "", pend: null, q: "" };
+  const AI_URL = { claude: ["https://claude.ai/new", "Claude"], chatgpt: ["https://chatgpt.com/", "ChatGPT"] };
+  const AI_QUICK = [["Объясни проще", "Объясни простыми словами, как будто я слышу это впервые."], ["Пример с числами", "Приведи пример с конкретными числами и проводками."], ["Почему так", "Почему именно так? Какое правило за этим стоит?"], ["По шагам", "Разбери по шагам и покажи, где обычно ошибаются."]];
+  const AI_MAX = 2000, cut = (t, n) => (t.length > n ? t.slice(0, n - 1).trim() + "…" : t);
+  const aiHidden = () => /^#\/mock/.test(location.hash) && !!S.mock.active;
+  function aiContext() {
+    const parts = location.hash.replace(/^#\//, "").split("/"), r = parts[0] || "", a = parts[1], h1 = $("#view h1");
+    if (r === "l" && LMAP[a]) return { label: `Урок «${LMAP[a].title}»`, topic: `модуль «${LMAP[a].mod.title}», урок «${LMAP[a].title}»` };
+    if (r === "exam") { const t = TASKS[clampN(a) - 1]; return { label: `Задание ${t.n} контрольной`, topic: `задание ${t.n} контрольной, тема «${t.topic}»`, cond: (t.cond || []).map(blockText).join(" ").replace(/\s+/g, " ").trim() }; }
+    const title = h1 ? h1.textContent.trim() : "Финучёт";
+    return { label: title, topic: `страница «${title}» на учебной платформе` };
+  }
+  function aiPrompt() {
+    const c = aiContext(), q = AI.q.trim(), L = [];
+    L.push("Я готовлюсь к контрольной по финансовому и управленческому учёту (бухучёт по РСБУ; отчёты: баланс, ОФР, ОДДС). Объясни подробно и понятно, на русском, с примером на числах, если это помогает. Если я в чём-то ошибаюсь, поправь.");
+    L.push(`Где я сейчас: ${c.topic}${AI.sec ? `, раздел «${AI.sec}»` : ""}.`);
+    if (AI.sel) L.push(`Фрагмент из материалов:\n«${cut(AI.sel, 900)}»`);
+    L.push(`Мой вопрос: ${q || (AI.sel ? "объясни этот фрагмент подробно." : "объясни эту тему подробно.")}`);
+    if (c.cond) { const room = AI_MAX - L.join("\n\n").length - 30; if (room > 200) L.splice(L.length - 1, 0, `Условие задания:\n${cut(c.cond, room)}`); }
+    return L.join("\n\n");
+  }
+  const ICON_AI = '<svg viewBox="0 0 24 24"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>';
+  function aiPanelHTML() {
+    const c = aiContext();
+    return `<div class="ai-head"><div><h3 class="h-sm">Спросить ИИ</h3><p class="tiny muted" style="margin-top:3px">Вопрос соберётся вместе с темой страницы. Ответ откроется в новой вкладке, там можно продолжить разговор.</p></div><button class="round sm" data-act="ai-close" aria-label="Закрыть">${ICON.x}</button></div>
+      <div class="ai-ctx"><span class="tag wrap">${esc(c.label)}${AI.sec ? `, ${esc(AI.sec)}` : ""}</span></div>
+      ${AI.sel ? `<div class="ai-sel"><p>${esc(cut(AI.sel, 400))}</p><button class="tiny" data-act="ai-unsel">Убрать фрагмент</button></div>` : `<p class="tiny muted ai-hint">Выдели текст в уроке или задании, и он попадёт в вопрос.</p>`}
+      <textarea id="ai-q" class="open-in" rows="3" placeholder="Что непонятно? Например: почему проценты по кредиту идут в стоимость объекта?" aria-label="Твой вопрос">${esc(AI.q)}</textarea>
+      <div class="chips" style="margin:8px 0 12px">${AI_QUICK.map(([t], i) => `<button class="chip" data-act="ai-quick" data-i="${i}">${t}</button>`).join("")}</div>
+      <div class="ai-go"><button class="pill ink" data-act="ai-go" data-p="claude">Спросить Claude</button><button class="pill" data-act="ai-go" data-p="chatgpt">Спросить ChatGPT</button></div>
+      <div class="ai-foot"><details class="ai-prev"><summary class="tiny muted">Что уйдёт в чат</summary><pre id="ai-prev-t">${esc(aiPrompt())}</pre></details><button class="tiny ai-copy" data-act="ai-copy">${ICON.copy}Скопировать</button></div>`;
+  }
+  const aiEls = () => { let f = $("#ai-fab"); if (!f) { f = document.createElement("button"); f.id = "ai-fab"; f.className = "ai-fab no-print"; f.dataset.act = "ai-open"; f.setAttribute("aria-label", "Спросить ИИ"); f.innerHTML = `<i>${ICON_AI}</i><span>Спросить ИИ</span>`; document.body.appendChild(f); const p = document.createElement("button"); p.id = "ai-pick"; p.className = "ai-pick no-print"; p.dataset.act = "ai-open-sel"; p.hidden = true; p.innerHTML = `${ICON_AI}Спросить ИИ`; p.addEventListener("mousedown", (e) => e.preventDefault()); document.body.appendChild(p); } return f; };
+  function aiOpen() { let p = $("#ai"); if (!p) { p = document.createElement("div"); p.id = "ai"; p.className = "ai-panel no-print"; p.setAttribute("role", "dialog"); p.setAttribute("aria-label", "Спросить ИИ"); document.body.appendChild(p); } p.innerHTML = aiPanelHTML(); $("#ai-fab").classList.add("on"); $("#ai-pick").hidden = true; const t = $("#ai-q"); if (t && matchMedia("(pointer:fine)").matches) t.focus(); }
+  const aiClose = () => { const p = $("#ai"); if (p) p.remove(); const f = $("#ai-fab"); if (f) f.classList.remove("on"); };
+  const aiPaintPrev = () => { const x = $("#ai-prev-t"); if (x) x.textContent = aiPrompt(); };
+  function aiSync() { const f = aiEls(); f.hidden = aiHidden(); if (aiHidden()) { aiClose(); $("#ai-pick").hidden = true; } else if ($("#ai")) { $("#ai").innerHTML = aiPanelHTML(); } }
+  function aiCopy(text, msg) { const done = () => toast(msg); if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => toast("Не вышло скопировать: выдели текст в «Что уйдёт в чат» вручную")); else toast("Не вышло скопировать: выдели текст в «Что уйдёт в чат» вручную"); }
+  function aiPick() {
+    const pick = $("#ai-pick"); if (!pick) return;
+    const s = window.getSelection(), txt = s && !s.isCollapsed ? String(s).replace(/\s+/g, " ").trim() : "", node = s && s.anchorNode, view = $("#view");
+    if (txt.length < 2 || !node || !view || !view.contains(node) || aiHidden()) { pick.hidden = true; AI.pend = null; return; }
+    const el = node.nodeType === 3 ? node.parentElement : node, box = el.closest(".section, .case-step, .bank-card, .qz, article"), hd = box && box.querySelector("h2, summary, h3");
+    AI.pend = { sel: txt.slice(0, 1500), sec: hd && !hd.contains(el) ? hd.textContent.replace(/\s+/g, " ").trim().slice(0, 90) : "" };
+    const r = s.getRangeAt(0).getBoundingClientRect(); pick.hidden = false;
+    const w = pick.offsetWidth, h = pick.offsetHeight, below = r.bottom + 10 + h < innerHeight - 90;
+    pick.style.left = Math.max(10, Math.min(innerWidth - w - 10, r.left + r.width / 2 - w / 2)) + "px";
+    pick.style.top = (below ? r.bottom + 10 : Math.max(10, r.top - h - 10)) + "px";
+  }
+  let aiT = null, aiRaf = 0;
+  document.addEventListener("selectionchange", () => { clearTimeout(aiT); aiT = setTimeout(aiPick, 160); });
+  window.addEventListener("scroll", () => { const p = $("#ai-pick"); if (p && !p.hidden && !aiRaf) aiRaf = requestAnimationFrame(() => { aiRaf = 0; aiPick(); }); }, { passive: true });
+  document.addEventListener("input", (e) => { if (e.target.id === "ai-q") { AI.q = e.target.value; aiPaintPrev(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#ai")) aiClose(); });
+  document.addEventListener("click", (e) => {
+    const ac = e.target.closest("[data-act^='ai-']"); if (!ac) return; const act = ac.dataset.act;
+    if (act === "ai-open") { if ($("#ai")) aiClose(); else aiOpen(); }
+    else if (act === "ai-open-sel") { if (AI.pend) { AI.sel = AI.pend.sel; AI.sec = AI.pend.sec; } aiOpen(); }
+    else if (act === "ai-close") aiClose();
+    else if (act === "ai-unsel") { AI.sel = ""; AI.sec = ""; aiOpen(); }
+    else if (act === "ai-quick") { const add = AI_QUICK[+ac.dataset.i][1], t = $("#ai-q"); AI.q = AI.q.trim() ? `${AI.q.trim()} ${add}` : add; if (t) { t.value = AI.q; t.focus(); } aiPaintPrev(); }
+    else if (act === "ai-copy") aiCopy(aiPrompt(), "Вопрос скопирован: вставь его в любой чат с ИИ");
+    else if (act === "ai-go") {
+      const [base, name] = AI_URL[ac.dataset.p], p = aiPrompt(), url = `${base}?q=${encodeURIComponent(p)}`;
+      if (url.length > 15000) { aiCopy(p, `Вопрос длинный: он скопирован, вставь его в ${name}`); window.open(base, "_blank", "noopener"); }
+      else window.open(url, "_blank", "noopener");
+    }
+  });
+  aiSync(); aiOn = true;
+
+  window.__fu = { OPENQ, sync, acc: () => accCode, S: () => S, LESSONS, QREG, BK, SCHEMES, VZ, LESSON_EXAM, aiPrompt };
 })();
