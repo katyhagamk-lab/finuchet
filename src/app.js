@@ -112,6 +112,10 @@
     (m.practice || []).forEach((p) => { p.mod = m; PMAP[p.id] = p; });
   });
   TASKS.forEach((t) => { QREG[`exam.${t.n}`] = { item: t.quiz, task: t }; });
+  const OPENQ = [], openItem = (o, q) => ({ type: "open", q: q || o.q, kw: o.kw, need: o.need, model: o.model, why: o.model });
+  MODS.forEach((m) => (m.open || []).forEach((o) => { if (!o.kw) return; o.mod = m; OPENQ.push(o); QREG[`open.${o.id}`] = { item: openItem(o), lesson: LMAP[o.lesson], open: o }; }));
+  MODS.forEach((m) => (m.practice || []).forEach((p) => { if (p.open && p.open.kw) QREG[`pr.${p.id}`] = { item: openItem(p.open), bankRef: { label: `Практикум: ${p.title}`, link: `p/${p.id}`, cond: [] } }; }));
+  const openFor = (lid) => OPENQ.filter((o) => o.lesson === lid);
   const BK = window.BANK, SCH = window.SCHEMES || [], SIMG = window.SCHEME_IMG || {};
   const SCHEMES = SCH.filter((x) => SIMG[x.id]);
   Object.keys(BK.bank).forEach((n) => BK.bank[n].forEach((t, i) => { QREG[`bank.${n}.${i}`] = { item: t.quiz, bankRef: { label: n === "18" ? `Банк, сквозная задача «${t.company}»` : `Банк, задание ${n}`, link: `bank/${n}`, cond: t.cond } }; }));
@@ -197,11 +201,14 @@
     } else if (item.type === "fields") {
       const ans = mock ? (S.mock.active && S.mock.active.answers[qid]) || {} : {};
       body = `<div class="fields">${item.fields.map((f, i) => `${f.group ? `<div class="field-group">${esc(f.group)}</div>` : ""}<label class="field"><span>${md(f.label)}</span><input class="num${solved ? " right" : ""}" inputmode="text" autocomplete="off" data-f="${i}" value="${solved ? fmt(f.answer) : mock && ans[i] != null ? esc(ans[i]) : ""}"${solved ? " disabled" : ""} data-enter="check"><span class="expect"></span></label>`).join("")}</div>${mock ? "" : `<div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button><button class="pill ghost" data-act="show">Показать ответ</button>`}</div>`}`;
+    } else if (item.type === "open") {
+      const prev = ((S.openAns || {})[qid]) || "";
+      body = `<textarea class="open-in" rows="3" placeholder="Напиши ответ своими словами" aria-label="Твой ответ"${solved ? " disabled" : ""}>${esc(prev)}</textarea><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button><button class="pill ghost" data-act="show">Показать ответ</button>`}</div>`;
     } else if (item.type === "sort") {
       const order = seeded(item.items, qid);
       body = `<div class="sort-list">${order.map(({ v, i }) => `<div class="sort-item${solved ? " right" : ""}" data-i="${i}"><span>${md(v.text)}</span><div class="sort-b">${item.buckets.map((b, bi) => `<button data-act="pick" data-b="${bi}" class="${solved && v.b === bi ? "on" : ""}"${solved ? " disabled" : ""}>${esc(b)}</button>`).join("")}</div></div>`).join("")}</div><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button>`}</div>`;
     }
-    const fb = solved && !o.hideWhy ? `<div class="fb ok"><b>Верно</b>${md(item.why)}</div><div class="qz-actions"><button class="pill ghost" data-act="redo">Решить заново</button></div>` : "";
+    const fb = solved && !o.hideWhy ? `<div class="fb ok"><b>${item.type === "open" ? "Засчитано" : "Верно"}</b>${item.type === "open" ? `<div class="model"><b>Образцовый ответ</b>${md(item.model)}</div>` : md(item.why)}</div><div class="qz-actions"><button class="pill ghost" data-act="redo">Решить заново</button></div>` : "";
     return `<div class="qz" data-q="${esc(qid)}"${mock ? ' data-mock="1"' : ""}>${badge}${o.noQ ? "" : `<p class="q">${md(item.q)}</p>`}${body}<div class="fb-slot">${fb}</div></div>`;
   }
   function record(qid, ok) {
@@ -218,6 +225,10 @@
     revealExam(el);
   }
   const revealExam = (el) => { const box = el.closest(".exam-inline"); if (box) { $$(".exam-inline-sol", box).forEach((x) => (x.hidden = false)); return; } const qid = el.dataset.q; if (qid && qid.startsWith("exam.")) { const s = $("#sol"); if (s) s.hidden = false; const e = $("#sol-btn"); if (e) e.hidden = true; } };
+  function openFeedback(item, r) {
+    const chips = r.hits.map((h) => `<span class="kw ${h.ok ? "ok" : "miss"}">${h.ok ? "✓" : "✗"} ${esc(h.l)}</span>`).join("");
+    return `<div class="fb ${r.ok ? "ok" : "bad"}"><b>${r.ok ? "Засчитано" : "Пока не засчитано"}</b>Названо ключевых идей: ${r.found} из ${r.total}, для зачёта нужно ${r.need}.<div class="kw-list">${chips}</div><div class="model"><b>Образцовый ответ</b>${md(item.model)}</div></div><div class="qz-actions"><button class="pill ghost" data-act="${r.ok ? "redo" : "retry"}">${r.ok ? "Решить заново" : "Дополнить ответ"}</button></div>`;
+  }
   function checkField(f, input) { const v = parseNum(input.value); const tol = f.tol || 0; return !isNaN(v) && Math.abs(v - f.answer) <= tol + 1e-9; }
   function doCheck(el) {
     const qid = el.dataset.q, item = getQ(qid); if (!item) return;
@@ -238,6 +249,15 @@
       record(qid, all);
       if (all) { ins.forEach((i) => (i.disabled = true)); $$(".qz-actions .pill", el).forEach((b) => b.remove()); feedback(el, true, item, altHit ? item.alt.note : ""); }
       else { $(".fb-slot", el).innerHTML = `<div class="fb bad"><b>Есть ошибка</b>Красные поля не совпали. Исправь и проверь ещё раз или открой ответ.</div>`; revealExam(el); }
+    } else if (item.type === "open") {
+      const ta = $(".open-in", el), v = ta.value.trim(), slot = $(".fb-slot", el);
+      if (v.length < 2) { slot.innerHTML = `<div class="fb hint">Напиши ответ хотя бы парой слов.</div>`; ta.focus(); return; }
+      const r = window.GRADE.grade(v, item.kw, item.need);
+      S.openAns = S.openAns || {}; S.openAns[qid] = v;
+      record(qid, r.ok);
+      slot.innerHTML = openFeedback(item, r);
+      if (r.ok) { ta.disabled = true; $$(".qz-actions .pill", el).forEach((b) => { if (b.dataset.act === "check" || b.dataset.act === "show") b.remove(); }); }
+      if (qid.startsWith("card.")) $$(".leitner .pill").forEach((b) => (b.disabled = false));
     } else if (item.type === "multi") {
       const sel = $$(".opt.sel", el).map((b) => +b.dataset.i);
       if (!sel.length) return;
@@ -376,9 +396,9 @@
     const secs = l.sections.map((s, si) => `<section class="section" id="sec-${si}"><h2>${esc(s.title)}</h2><div class="blocks">${renderBlocks(s.blocks)}</div>${si === 0 && vizFor("lesson", l.id).length ? `<div style="margin-top:18px;display:flex;flex-direction:column;gap:14px">${vizFor("lesson", l.id).map(vizBlock).join("")}</div>` : ""}<div class="check"><div class="check-head"><span class="ring"></span><h3>Проверь себя</h3><span class="small muted" data-secstat="${si}"></span></div>${(s.quiz || []).map((q, qi) => quizHTML(`${l.id}.s${si}.q${qi}`, q)).join("")}</div></section>`).join("");
     const examLinks = (l.examTasks || []).map((n) => `<a class="tag lime" href="#/exam/${n}">Задание ${n}</a>`).join(" ");
     return `${crumbs([["", "Главная"], ["theory", "Теория"], [`m/${m.id}`, SHORT[m.id] || m.title], ["", l.title]])}
-    <div class="reader" data-lesson="${l.id}"><article><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
+    <div class="reader" data-lesson="${l.id}"><article><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что ты упустила.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
       <div class="glass" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-radius:28px"><button class="pill ghost" data-act="manual" data-id="${l.id}">${S.manual[l.id] ? "Снять отметку «изучено»" : "Отметить как изученный"}</button><div style="display:flex;gap:8px;flex-wrap:wrap">${prev ? `<a class="pill" href="#/l/${prev.id}">Назад</a>` : ""}${nxt ? `<a class="pill ink" href="#/l/${nxt.id}">Следующий урок</a>` : `<a class="pill ink" href="#/exam">К контрольной</a>`}</div></div></article>
-    <aside class="toc"><h4>В этом уроке</h4>${l.sections.map((s, si) => `<a href="#/l/${l.id}" data-scroll="sec-${si}" data-toc="${si}" class="${secState(l, si)}"><i></i><span>${esc(s.title)}</span></a>`).join("")}${(LESSON_EXAM[l.id] || []).length ? `<a href="#/l/${l.id}" data-scroll="sec-exam" class="${LESSON_EXAM[l.id].every((n) => isOk(`exam.${n}`)) ? "done" : ""}"><i></i><span>Задание с контрольной</span></a>` : ""}<div class="toc-progress" id="toc-progress">${tocProgress(l)}</div></aside></div>`;
+    <aside class="toc"><h4>В этом уроке</h4>${l.sections.map((s, si) => `<a href="#/l/${l.id}" data-scroll="sec-${si}" data-toc="${si}" class="${secState(l, si)}"><i></i><span>${esc(s.title)}</span></a>`).join("")}${openFor(l.id).length ? `<a href="#/l/${l.id}" data-scroll="sec-open" class="${openFor(l.id).every((o) => isOk(`open.${o.id}`)) ? "done" : ""}"><i></i><span>Ответь своими словами</span></a>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<a href="#/l/${l.id}" data-scroll="sec-exam" class="${LESSON_EXAM[l.id].every((n) => isOk(`exam.${n}`)) ? "done" : ""}"><i></i><span>Задание с контрольной</span></a>` : ""}<div class="toc-progress" id="toc-progress">${tocProgress(l)}</div></aside></div>`;
   }
   function examInline(n) {
     const t = TASKS[n - 1], st = S.quiz[`exam.${n}`];
@@ -400,6 +420,7 @@
     return `${crumbs([["", "Главная"], ["theory", "Теория"], [`m/${m.id}`, SHORT[m.id] || m.title], ["", "Практикум"]])}
     <div style="max-width:820px"><h1 class="h-lg" style="margin-bottom:8px">${esc(p.title)}</h1><div class="chips" style="margin-bottom:22px"><span class="tag wrap">${esc(p.src || "")}</span>${(p.examTasks || []).map((n) => `<a class="tag lime" href="#/exam/${n}">Задание ${n}</a>`).join("")}</div>
     <div class="paper"><h2 class="h-sm" style="margin-bottom:12px">Условие</h2><div class="blocks">${renderBlocks(p.condition)}</div></div>
+    ${p.open && p.open.kw ? `<div class="check"><div class="check-head"><span class="ring"></span><h3>Твой ответ</h3></div>${quizHTML(`pr.${p.id}`, QREG[`pr.${p.id}`].item)}</div>` : ""}
     <div id="p-sol" ${S.practice[p.id] ? "" : "hidden"} style="margin-top:22px"><h2 class="h-md" style="margin-bottom:14px">Решение</h2><div class="blocks">${renderBlocks(p.solution)}</div><div class="b-note exam" style="margin-top:14px"><b>Итог</b><span>${md(p.answer)}</span></div></div>
     <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">${S.practice[p.id] ? "" : `<button class="pill ink" data-act="psol" data-id="${p.id}">Показать решение</button>`}${nx ? `<a class="pill" href="#/p/${nx.id}">Следующее задание</a>` : `<a class="pill" href="#/m/${m.id}">К модулю</a>`}</div></div>`;
   }
@@ -553,10 +574,12 @@
   function viewCards(mid) {
     const pool = cardPool(mid), box = (c) => S.cards[c.key] || 1;
     if (!cardSess || cardSess.mid !== mid) { const sorted = seeded(pool, "s" + Math.floor(Date.now() / 86400000)).map((x) => x.v).sort((a, b) => box(a) - box(b)); cardSess = { mid, queue: sorted, flipped: false }; }
-    const c = cardSess.queue[0], counts = [1, 2, 3].map((b) => pool.filter((x) => box(x) === b).length);
+    const c = cardSess.queue[0], counts = [1, 2, 3].map((b) => pool.filter((x) => box(x) === b).length), write = !!S.cardWrite && c && c.kw;
+    const modeChips = `<div class="chips" style="margin-bottom:14px;justify-content:center"><button class="chip ${S.cardWrite ? "" : "on"}" data-act="card-mode" data-v="0">Переворачивать</button><button class="chip ${S.cardWrite ? "on" : ""}" data-act="card-mode" data-v="1">Писать ответ</button></div>`;
+    if (write) { const qid = `card.${c.key}.${cardSess.n || 0}`; EPH[qid] = { type: "open", q: c.q, kw: c.kw, need: c.need, model: c.a, why: c.a }; }
     return `${crumbs([["", "Главная"], ["bank", "Банк заданий"], ["", "Карточки"]])}${trainTabs("cards")}<div class="pagehead" style="margin-bottom:16px"><div><h1 class="h-xl">Карточки</h1></div></div>
     <div class="chips" style="margin-bottom:18px"><a class="chip ${!mid ? "on" : ""}" href="#/cards">Все</a>${MODS.filter((m) => (m.flashcards || []).length).map((m) => `<a class="chip ${mid === m.id ? "on" : ""}" href="#/cards/${m.id}">${esc(SHORT[m.id] || m.title)}</a>`).join("")}</div>
-    <div class="flash-wrap">${c ? `<button class="flash ${cardSess.flipped ? "flipped" : ""}" data-act="flip" aria-label="Перевернуть карточку"><div class="flash-in"><div class="flash-f mesh" style="--c:${COLORS[c.m.id]};background:radial-gradient(70% 70% at 50% 60%,color-mix(in srgb,var(--c) 92%,#000 4%) 0%,color-mix(in srgb,var(--c) 58%,#fff) 60%,color-mix(in srgb,var(--c) 22%,#E8E8E8) 100%)"><span class="tiny" style="opacity:.92">${esc(SHORT[c.m.id] || "")}</span><span class="big">${md(c.q)}</span><span class="tiny" style="opacity:.85">Нажми, чтобы увидеть ответ</span></div><div class="flash-f back"><span class="tiny muted">Ответ</span><span class="txt">${md(c.a)}</span></div></div></button>
+    <div class="flash-wrap">${modeChips}${write ? `<div class="flash-write"><span class="tiny muted">${esc(SHORT[c.m.id] || "")}</span><h2 class="big">${md(c.q)}</h2>${quizHTML(`card.${c.key}.${cardSess.n || 0}`, EPH[`card.${c.key}.${cardSess.n || 0}`], { noQ: true })}</div><div class="leitner"><button class="pill" data-act="card-no" disabled>Повторить ещё</button><button class="pill ink" data-act="card-yes" disabled>Помню</button></div>` : c ? `<button class="flash ${cardSess.flipped ? "flipped" : ""}" data-act="flip" aria-label="Перевернуть карточку"><div class="flash-in"><div class="flash-f mesh" style="--c:${COLORS[c.m.id]};background:radial-gradient(70% 70% at 50% 60%,color-mix(in srgb,var(--c) 92%,#000 4%) 0%,color-mix(in srgb,var(--c) 58%,#fff) 60%,color-mix(in srgb,var(--c) 22%,#E8E8E8) 100%)"><span class="tiny" style="opacity:.92">${esc(SHORT[c.m.id] || "")}</span><span class="big">${md(c.q)}</span><span class="tiny" style="opacity:.85">Нажми, чтобы увидеть ответ</span></div><div class="flash-f back"><span class="tiny muted">Ответ</span><span class="txt">${md(c.a)}</span></div></div></button>
     <div class="leitner"><button class="pill" data-act="card-no" ${cardSess.flipped ? "" : "disabled"}>Повторить ещё</button><button class="pill ink" data-act="card-yes" ${cardSess.flipped ? "" : "disabled"}>Помню</button></div>` : `<div class="empty"><p class="h-sm">Круг пройден</p><p>Все карточки просмотрены. Начни заново, чтобы повторить слабые.</p><button class="pill ink" data-act="card-reset" style="margin-top:14px">Начать заново</button></div>`}
     <div class="tr-grid" style="margin-top:22px;grid-template-columns:repeat(3,1fr);gap:8px">${["Учу", "Повторяю", "Помню"].map((t, i) => `<div class="glass" style="padding:14px;text-align:center;border-radius:20px"><span class="dots" style="font-size:32px">${counts[i]}</span><div class="tiny muted">${t}</div></div>`).join("")}</div></div>`;
   }
@@ -628,6 +651,7 @@
     LESSONS.forEach((l) => (l.sections || []).forEach((s, si) => searchIndex.push({ title: l.title, sub: s.title, text: (s.blocks || []).map(blockText).join(" ").replace(/\*\*/g, ""), link: `l/${l.id}`, scroll: `sec-${si}` })));
     TASKS.forEach((t) => searchIndex.push({ title: `Контрольная, задание ${t.n}`, sub: t.topic, text: t.cond.map(blockText).join(" "), link: `exam/${t.n}` }));
     MODS.forEach((m) => (m.practice || []).forEach((p) => searchIndex.push({ title: p.title, sub: "Практикум", text: (p.condition || []).map(blockText).join(" "), link: `p/${p.id}` })));
+    OPENQ.forEach((o) => searchIndex.push({ title: o.q, sub: "Вопрос на теорию", text: o.model, link: "bank/open" }));
     SCHEMES.forEach((x) => searchIndex.push({ title: x.title, sub: "Схема", text: `${x.note} ${x.text.join(" ")}`, link: "schemes", scroll: `sch-${x.id}` }));
     Object.keys(BK.bank).forEach((n) => BK.bank[n].forEach((t, i) => searchIndex.push({ title: n === "18" ? `Банк, сквозная задача «${t.company}»` : `Банк, задание ${n}`, sub: `Задание ${i + 1}`, text: t.cond.map(blockText).join(" "), link: `bank/${n}`, scroll: `bank.${n}.${i}` })));
   }
@@ -667,6 +691,7 @@
     const group = (title, f) => { const l = BK.types.filter(f); return l.length ? `<div class="sechead" style="margin-top:28px"><h2 class="h-md">${title}</h2></div><div class="tr-grid">${l.map(card).join("")}</div>` : ""; };
     return `${crumbs([["", "Главная"], ["", "Банк заданий"]])}${trainTabs("bank")}
     <section class="mesh mesh-green" style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:6px"><div><h1 class="h-xl">Банк заданий</h1><p style="margin-top:8px;max-width:54ch;font-size:17px">Похожие задания на каждый тип из контрольной: другая ситуация и другие числа, тот же принцип. В варианты контрольной они не входят.</p></div><div style="text-align:right"><span class="dots" style="font-size:64px">${done}</span><div class="small">из ${BK.total} решено</div></div></section>
+    ${OPENQ.length ? `<div class="sechead" style="margin-top:28px"><h2 class="h-md">Открытые вопросы</h2></div><div class="tr-grid"><a class="tr" href="#/bank/open"><div style="display:flex;justify-content:space-between;align-items:center"><span class="tag lime">Своими словами</span><span class="small muted">${OPENQ.filter((o) => isOk(`open.${o.id}`)).length} из ${OPENQ.length}</span></div><h3>Вопросы на теорию</h3><p>Пишешь ответ, платформа проверяет ключевые идеи.</p></a></div>` : ""}
     ${group("Тестовая часть", (t) => t.kind === "тест")}${group("Расчёты", (t) => t.kind === "расчёт")}${group("Отчётность", (t) => t.kind === "отчёт")}`;
   }
   function viewBankType(n) {
@@ -676,6 +701,12 @@
     <div class="pagehead"><div><h1 class="h-lg" style="font-size:clamp(30px,4vw,46px)">${esc(t.title)}</h1><p class="muted" style="margin-top:8px"><span id="bank-stat">Решено ${bankDone(n)} из ${list.length}</span></p><div class="chips" style="margin-top:12px"><a class="chip" href="#/${exLink}">Разбор ${n === 18 ? "заданий 18–22" : `задания ${n}`} из контрольной</a>${(EX.tasks[n - 1].gen ? `<a class="chip" href="#/train/${EX.tasks[n - 1].gen}">Тренажёр с новыми числами</a>` : "")}${(LINKS[n] || []).length ? `<a class="chip" href="#/l/${[...LINKS[n]].sort((a, b) => a.examTasks.length - b.examTasks.length)[0].id}">Теория</a>` : ""}</div></div></div>
     ${sch.length ? `<div style="max-width:860px;margin-bottom:24px">${schemeStrip(sch.slice(0, 2))}</div>` : ""}
     <div style="max-width:860px;display:flex;flex-direction:column;gap:18px">${list.map((x, i) => bankCard(`bank.${n}.${i}`, x, n === 18 ? `Компания «${x.company}»` : `Задание ${i + 1}`)).join("")}</div>`;
+  }
+  function viewOpenBank() {
+    const byMod = MODS.filter((m) => OPENQ.some((o) => o.mod === m));
+    return `${crumbs([["", "Главная"], ["bank", "Банк заданий"], ["", "Вопросы на теорию"]])}<div class="pagehead"><div><h1 class="h-lg" style="font-size:clamp(30px,4vw,46px)">Вопросы на теорию</h1><p class="muted" style="margin-top:8px;max-width:60ch">Ответь своими словами. Проверка ищет ключевые идеи, допускает разные формулировки и мелкие опечатки. Решено ${OPENQ.filter((o) => isOk(`open.${o.id}`)).length} из ${OPENQ.length}.</p></div></div>
+    <div class="chips" style="margin-bottom:18px">${byMod.map((m) => `<a class="chip" href="#/bank/open" data-scroll="om-${m.id}">${esc(SHORT[m.id] || m.title)}</a>`).join("")}</div>
+    <div style="max-width:860px;display:flex;flex-direction:column;gap:12px">${byMod.map((m) => `<h2 class="h-md" id="om-${m.id}" style="margin-top:14px;scroll-margin-top:14px">${esc(m.title)}</h2>${OPENQ.filter((o) => o.mod === m).map((o) => `<div><div class="tiny muted" style="margin:0 0 6px 6px"><a href="#/l/${o.lesson}">${esc(LMAP[o.lesson] ? LMAP[o.lesson].title : "")}</a></div>${quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item, { noBadge: true })}</div>`).join("")}`).join("")}</div>`;
   }
   const bankCard = (qid, x, title) => `<article class="paper bank-card" id="${esc(qid)}"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 class="h-sm">${esc(title)}</h2>${isOk(qid) ? `<span class="tag lime">Решено</span>` : isTried(qid) ? `<span class="tag bad">Была ошибка</span>` : ""}</div><div class="blocks">${renderBlocks(x.cond)}</div><div style="margin-top:12px">${quizHTML(qid, x.quiz, { noBadge: true })}</div>${x.sol && x.sol.length ? `<details class="case-step" style="margin:12px 0 0"><summary>Показать разбор</summary><div class="blocks">${renderBlocks(x.sol)}</div></details>` : ""}</article>`;
 
@@ -774,7 +805,7 @@
     else if (r === "plan") html = viewPlan();
     else if (r === "notes") html = viewNotes();
     else if (r === "account") html = viewAccount();
-    else if (r === "bank") html = a ? viewBankType(+a) : viewBank();
+    else if (r === "bank") html = a === "open" ? viewOpenBank() : a ? viewBankType(+a) : viewBank();
     else if (r === "variants") html = viewVariants();
     else if (r === "v") html = parts[2] === "study" ? viewVariantStudy(+a) : parts[2] === "print" ? viewVariantPrint(+a) : viewVariant(+a);
     else if (r === "schemes") { const gs = [...new Set(SCHEMES.map((x) => x.group))]; html = viewSchemes(a != null && a !== "" ? gs[+a] : null); }
@@ -843,6 +874,12 @@
       const row = ac.closest(".sort-item"); $$(".sort-b button", row).forEach((b) => b.classList.toggle("on", b === ac));
     } else if (act === "check") { doCheck(qz); }
     else if (act === "hint") { const item = getQ(qz.dataset.q); $(".fb-slot", qz).innerHTML = `<div class="fb hint">${md(item.hint)}</div>`; }
+    else if (act === "show" && getQ(qz.dataset.q) && getQ(qz.dataset.q).type === "open") {
+      const item = getQ(qz.dataset.q), qid = qz.dataset.q;
+      $(".fb-slot", qz).innerHTML = `<div class="fb hint"><div class="model" style="margin:0;border:0;padding:0"><b>Образцовый ответ</b>${md(item.model)}</div><div class="kw-list">${item.kw.map((k) => `<span class="kw">${esc(k.l)}</span>`).join("")}</div></div>`;
+      if (!EPH[qid] && !isOk(qid)) record(qid, false);
+      if (qid.startsWith("card.")) $$(".leitner .pill").forEach((b) => (b.disabled = false));
+    }
     else if (act === "show") {
       const item = getQ(qz.dataset.q);
       $$(".field .num", qz).forEach((inp) => { const f = item.fields[+inp.dataset.f]; if (!checkField(f, inp)) inp.closest(".field").querySelector(".expect").textContent = fmt(f.answer); });
@@ -898,7 +935,9 @@
     else if (act === "gen-next") { const id = ac.dataset.id; trainSeeds[id] = Math.floor(Math.random() * 1e9) + 1; route(); }
     else if (act === "gen-sol") { $("#gen-sol").hidden = false; ac.remove(); $("#gen-sol").scrollIntoView({ behavior: "smooth" }); }
     else if (act === "flip") { cardSess.flipped = !cardSess.flipped; ac.classList.toggle("flipped", cardSess.flipped); $$(".leitner .pill").forEach((b) => (b.disabled = !cardSess.flipped)); }
-    else if (act === "card-yes" || act === "card-no") { const c = cardSess.queue.shift(), b = S.cards[c.key] || 1; if (act === "card-yes") S.cards[c.key] = Math.min(3, b + 1); else { S.cards[c.key] = 1; cardSess.queue.splice(Math.min(3, cardSess.queue.length), 0, c); } cardSess.flipped = false; bump(); save(); route(); }
+    else if (act === "card-mode") { S.cardWrite = ac.dataset.v === "1"; save(); route(); }
+    else if (act === "card-yes" || act === "card-no") { cardSess.n = (cardSess.n || 0) + 1; }
+    if (act === "card-yes" || act === "card-no") { const c = cardSess.queue.shift(), b = S.cards[c.key] || 1; if (act === "card-yes") S.cards[c.key] = Math.min(3, b + 1); else { S.cards[c.key] = 1; cardSess.queue.splice(Math.min(3, cardSess.queue.length), 0, c); } cardSess.flipped = false; bump(); save(); route(); }
     else if (act === "card-reset") { cardSess = null; route(); }
     else if (act === "print") window.print();
     else if (act === "export") { const blob = new Blob([JSON.stringify(S, null, 1)], { type: "application/json" }), a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `finuchet-progress-${today()}.json`; a.click(); URL.revokeObjectURL(a.href); toast("Файл с прогрессом скачан"); }
@@ -942,5 +981,5 @@
   window.addEventListener("online", () => { if (dirty) push(false); });
   route();
   pull(true).catch(() => {});
-  window.__fu = { sync, acc: () => accCode, S: () => S, LESSONS, QREG, BK, SCHEMES, VZ, LESSON_EXAM };
+  window.__fu = { OPENQ, sync, acc: () => accCode, S: () => S, LESSONS, QREG, BK, SCHEMES, VZ, LESSON_EXAM };
 })();

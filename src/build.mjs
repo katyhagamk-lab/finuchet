@@ -12,8 +12,10 @@ if (fs.existsSync(contentDir)) {
     const m = f.includes("_module.json") ? JSON.parse(fs.readFileSync(path.join(d, "_module.json"), "utf8")) : { id, title: id, subtitle: "" }; delete m.issues;
     m.lessons = f.filter((x) => /^l\d+\.json$/.test(x)).sort().map((x) => JSON.parse(fs.readFileSync(path.join(d, x), "utf8")));
     m.practice = f.includes("practice.json") ? JSON.parse(fs.readFileSync(path.join(d, "practice.json"), "utf8")) : [];
+    m.open = f.includes("open.json") ? JSON.parse(fs.readFileSync(path.join(d, "open.json"), "utf8")).map(({ bad, ...o }) => o) : [];
+    m.practice.forEach((p) => { if (p.open) delete p.open.bad; });
     const c = f.includes("cards.json") ? JSON.parse(fs.readFileSync(path.join(d, "cards.json"), "utf8")) : {};
-    m.flashcards = c.flashcards || []; m.cheatsheet = c.cheatsheet || [];
+    m.flashcards = (c.flashcards || []).map(({ bad, ...x }) => x); m.cheatsheet = c.cheatsheet || [];
     modules.push(m);
   }
 }
@@ -41,9 +43,10 @@ const html = `<!doctype html>
 <script>${read("viz.js")}</script>
 <script>${read("bankcalc.js")}</script>
 <script>${read("bank.js")}</script>
+<script>${read("grade.js")}</script>
 <script>${read("app.js")}</script>
 </body></html>`;
 const out = path.join(here, "..", "index.html");
 fs.writeFileSync(out, html);
-const stat = modules.map((m) => `${m.id}: ${m.lessons.length} ур., ${m.lessons.flatMap((l) => l.sections).flatMap((s) => s.quiz).length} зад., ${m.practice.length} разб., ${m.flashcards.length} карт.`);
+const stat = modules.map((m) => `${m.id}: ${m.lessons.length} ур., ${m.lessons.flatMap((l) => l.sections).flatMap((s) => s.quiz).length} зад., ${m.practice.length} разб. (открытых ${m.practice.filter((p) => p.open).length}), ${m.flashcards.length} карт. (с ключами ${m.flashcards.filter((x) => x.kw).length}), вопросов на теорию ${m.open.length}`);
 console.log(stat.join("\n") || "контента пока нет"); console.log("тестов банка:", Object.values(bankTests).reduce((a, x) => a + x.length, 0), "схем:", Object.keys(schemeImg).length); console.log("index.html:", (html.length / 1024 / 1024).toFixed(2), "МБ");
