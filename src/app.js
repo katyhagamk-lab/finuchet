@@ -216,7 +216,7 @@
       const order = seeded(item.items, qid);
       body = `<div class="sort-list">${order.map(({ v, i }) => `<div class="sort-item${solved ? " right" : ""}" data-i="${i}"><span>${md(v.text)}</span><div class="sort-b">${item.buckets.map((b, bi) => `<button data-act="pick" data-b="${bi}" class="${solved && v.b === bi ? "on" : ""}"${solved ? " disabled" : ""}>${esc(b)}</button>`).join("")}</div></div>`).join("")}</div><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button>`}</div>`;
     }
-    const fb = solved && !o.hideWhy ? `<div class="fb ok"><b>${item.type === "open" ? "Засчитано" : "Верно"}</b>${item.type === "open" ? `<div class="model"><b>Образцовый ответ</b>${md(item.model)}</div>` : md(item.why)}</div><div class="qz-actions"><button class="pill ghost" data-act="redo">Решить заново</button></div>` : "";
+    const fb = solved && !o.hideWhy ? `<div class="fb ok"><b>${item.type === "open" ? "Засчитано" : "Верно"}</b>${item.type === "open" ? `<div class="model"><b>Образцовый ответ</b>${md(item.model)}</div>` : md(item.why)}</div>${(item.type === "choice" || item.type === "multi") ? optBreakdown(item, (item.keep ? item.options.map((v, i) => ({ v, i })) : seeded(item.options, qid)).map((x) => x.i), null, false) : ""}<div class="qz-actions"><button class="pill ghost" data-act="redo">Решить заново</button></div>` : "";
     return `<div class="qz" data-q="${esc(qid)}"${mock ? ' data-mock="1"' : ""}>${badge}${o.noQ ? "" : `<p class="q">${md(item.q)}</p>`}${body}<div class="fb-slot">${fb}</div></div>`;
   }
   function record(qid, ok) {
@@ -226,10 +226,18 @@
     bump(); save(); paintProgress(qid);
     const bs = $("#bank-stat"); if (bs && qid.startsWith("bank.")) { const n = qid.split(".")[1]; bs.textContent = `Решено ${bankDone(n)} из ${BK.bank[n].length}`; }
   }
-  function feedback(el, ok, item, extra) {
+  /* Разбор каждого варианта: открыт после ошибки, свёрнут после верного ответа */
+  function optBreakdown(item, order, chosen, open) {
+    if (!Array.isArray(item.ow) || !Array.isArray(item.options) || item.ow.length !== item.options.length) return "";
+    const right = new Set(Array.isArray(item.answer) ? item.answer : [item.answer]), pick = new Set(chosen == null ? [] : Array.isArray(chosen) ? chosen : [chosen]);
+    const rows = (order && order.length ? order : item.options.map((_, i) => i)).map((i) => `<li class="ob ${right.has(i) ? "ok" : "no"}${pick.has(i) ? " me" : ""}"><span class="ob-m" aria-hidden="true">${right.has(i) ? ICON.check : ICON.x}</span><div><p class="ob-o"><span class="vh">${right.has(i) ? "Верный вариант: " : "Неверный вариант: "}</span>${md(item.options[i])}${pick.has(i) ? ` <span class="tag ${right.has(i) ? "ok" : "bad"}">твой ответ</span>` : ""}</p><p class="ob-w">${md(item.ow[i])}</p></div></li>`).join("");
+    return `<details class="ob-box"${open ? " open" : ""}><summary>Разбор всех вариантов</summary><ul class="ob-list">${rows}</ul></details>`;
+  }
+  function feedback(el, ok, item, extra, chosen) {
     const slot = $(".fb-slot", el);
     const redo = ok ? `<div class="qz-actions"><button class="pill ghost" data-act="redo">Решить заново</button></div>` : `<div class="qz-actions"><button class="pill ghost" data-act="retry">Попробовать ещё раз</button></div>`;
-    slot.innerHTML = `<div class="fb ${ok ? "ok" : "bad"}"><b>${ok ? "Верно" : "Не совпало"}</b>${extra ? `${md(extra)}<br>` : ""}${md(item.why)}</div>${redo}`;
+    const ob = item.type === "choice" || item.type === "multi" ? optBreakdown(item, $$(".opt", el).map((b) => +b.dataset.i), chosen, !ok) : "";
+    slot.innerHTML = `<div class="fb ${ok ? "ok" : "bad"}"><b>${ok ? "Верно" : "Не совпало"}</b>${extra ? `${md(extra)}<br>` : ""}${md(item.why)}</div>${ob}${redo}`;
     revealExam(el);
   }
   const revealExam = (el) => { const box = el.closest(".exam-inline"); if (box) { $$(".exam-inline-sol", box).forEach((x) => (x.hidden = false)); return; } const qid = el.dataset.q; if (qid && qid.startsWith("exam.")) { const s = $("#sol"); if (s) s.hidden = false; const e = $("#sol-btn"); if (e) e.hidden = true; unlockPhoto(); } };
@@ -273,7 +281,7 @@
       const ok = sel.length === item.answer.length && sel.every((i) => item.answer.includes(i));
       $$(".opt", el).forEach((b) => { const i = +b.dataset.i; b.disabled = true; b.classList.remove("sel"); if (item.answer.includes(i)) b.classList.add("right"); else if (sel.includes(i)) b.classList.add("wrong"); });
       $$(".qz-actions .pill", el).forEach((b) => b.remove());
-      record(qid, ok); feedback(el, ok, item);
+      record(qid, ok); feedback(el, ok, item, "", sel);
     } else if (item.type === "sort") {
       const rows = $$(".sort-item", el); const unset = rows.some((r) => !$(".on", r));
       if (unset) { $(".fb-slot", el).innerHTML = `<div class="fb hint">Распредели все строки.</div>`; return; }
@@ -584,7 +592,7 @@
     return `${crumbs([["", "Главная"], ["exam", "Контрольная"], ["mock", "Пробная"], ["", "Результат"]])}
     <section class="mesh ${pct >= 70 ? "mesh-green" : pct >= 40 ? "mesh-orange" : "mesh-pink"}" style="padding:34px;margin-bottom:18px;text-align:center"><div style="font-size:17px">Результат</div><div class="dots" style="font-size:96px;margin:18px 0 8px">${r.score}</div><div style="font-size:18px">из ${r.total} заданий, потрачено ${r.used} мин</div></section>
     <div class="result-grid" style="margin-bottom:22px">${list.map((t) => `<a class="tile ${typeOf(t) ? "ok" : "bad"}" href="${r.mode === "orig" ? `#/exam/${t.n}` : `#/mock/result`}" data-scroll="${r.mode === "orig" ? "" : `rq-${t.n}`}">${t.n}</a>`).join("")}</div>
-    ${list.filter((t) => !typeOf(t)).map((t) => { const ans = r.answers[`mock.${t.n}`]; return `<details class="case-step" id="rq-${t.n}"><summary>Задание ${t.n}. ${esc(t.topic)}</summary><div class="blocks"><div class="fields">${t.quiz.type === "fields" ? t.quiz.fields.map((f, i) => { const v = parseNum(ans && ans[i]), ok = !isNaN(v) && Math.abs(v - f.answer) <= (f.tol || 0) + 1e-9; return `<div class="field" style="grid-template-columns:1fr auto auto"><span>${md(f.label)}</span><span class="${ok ? "" : "faint"}">${ans && ans[i] ? esc(ans[i]) : "нет ответа"}</span><b style="font-weight:550;color:var(--ok)">${fmt(f.answer)}</b></div>`; }).join("") : `<p>Твой ответ: ${ans != null ? md(t.quiz.options[ans]) : "нет ответа"}</p><p><b>Верно:</b> ${md(t.quiz.options[t.quiz.answer])}</p>`}</div>${r.mode === "orig" ? `<a class="pill" href="#/exam/${t.n}">Открыть разбор задания</a>` : t.isCase ? "" : t.genSol ? renderBlocks(t.genSol) : ""}</div></details>`; }).join("")}
+    ${list.filter((t) => !typeOf(t)).map((t) => { const ans = r.answers[`mock.${t.n}`]; return `<details class="case-step" id="rq-${t.n}"><summary>Задание ${t.n}. ${esc(t.topic)}</summary><div class="blocks"><div class="fields">${t.quiz.type === "fields" ? t.quiz.fields.map((f, i) => { const v = parseNum(ans && ans[i]), ok = !isNaN(v) && Math.abs(v - f.answer) <= (f.tol || 0) + 1e-9; return `<div class="field" style="grid-template-columns:1fr auto auto"><span>${md(f.label)}</span><span class="${ok ? "" : "faint"}">${ans && ans[i] ? esc(ans[i]) : "нет ответа"}</span><b style="font-weight:550;color:var(--ok)">${fmt(f.answer)}</b></div>`; }).join("") : `<p>Твой ответ: ${ans != null ? md(t.quiz.options[ans]) : "нет ответа"}</p><p><b>Верно:</b> ${md(t.quiz.options[t.quiz.answer])}</p>${optBreakdown(t.quiz, null, ans, true)}`}</div>${r.mode === "orig" ? `<a class="pill" href="#/exam/${t.n}">Открыть разбор задания</a>` : t.isCase ? "" : t.genSol ? renderBlocks(t.genSol) : ""}</div></details>`; }).join("")}
     ${r.mode !== "orig" && list.some((t) => t.n === 18 && t.genSol) ? `<details class="case-step" style="margin-top:12px"><summary>Полное решение сквозной задачи</summary><div class="blocks">${renderBlocks(list.find((t) => t.n === 18).genSol)}</div></details>` : ""}
     <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap"><a class="pill ink" href="#/variants">К вариантам</a><a class="pill" href="#/mock">Пробная</a><a class="pill" href="#/mistakes">Работа над ошибками</a></div>`;
   }
@@ -930,7 +938,7 @@
       if (item.type === "multi") { ac.classList.toggle("sel"); return; }
       const ok = i === item.answer;
       $$(".opt", qz).forEach((b) => { const j = +b.dataset.i; b.disabled = true; if (j === item.answer) b.classList.add("right"); else if (j === i) b.classList.add("wrong"); });
-      record(qz.dataset.q, ok); feedback(qz, ok, item); if (location.hash.startsWith("#/exam")) paintExamMap();
+      record(qz.dataset.q, ok); feedback(qz, ok, item, "", i); if (location.hash.startsWith("#/exam")) paintExamMap();
     } else if (act === "tf") {
       const item = getQ(qz.dataset.q), v = ac.dataset.v === "true", ok = v === item.answer;
       $$(".opt", qz).forEach((b) => { const bv = b.dataset.v === "true"; b.disabled = true; if (bv === item.answer) b.classList.add("right"); else if (bv === v) b.classList.add("wrong"); });

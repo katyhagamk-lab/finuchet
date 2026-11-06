@@ -6,7 +6,7 @@ window.BANK = (function () {
   function shuffled(arr, key) { let x = hash(key) || 1; const r = () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return (x >>> 0) / 4294967296; }; const a = arr.map((v, i) => ({ v, i })); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
   function prepTest(q) {
     const order = shuffled(q.options, q.q);
-    return { cond: [P(q.q)], src: q.src, quiz: { type: "choice", keep: true, q: "Выбери один ответ", options: order.map((o, i) => `${LET[i]}) ${o.v}`), answer: order.findIndex((o) => o.i === q.answer), why: q.why }, sol: [P(q.why), { t: "note", kind: "law", text: `Источник: ${q.src}` }] };
+    return { cond: [P(q.q)], src: q.src, quiz: { type: "choice", keep: true, q: "Выбери один ответ", options: order.map((o, i) => `${LET[i]}) ${o.v}`), answer: order.findIndex((o) => o.i === q.answer), why: q.why, ow: Array.isArray(q.ow) && q.ow.length === q.options.length ? order.map((o) => q.ow[o.i]) : undefined }, sol: [P(q.why), { t: "note", kind: "law", text: `Источник: ${q.src}` }] };
   }
   const topic = (n) => EX[n - 1].topic, kind = (n) => EX[n - 1].kind;
   const testTypes = [1, 2, 3, 4, 5, 6, 9], calcTypes = [7, 8, 10, 11, 12, 13, 14, 15, 16, 17];
