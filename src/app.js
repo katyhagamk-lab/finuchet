@@ -298,12 +298,14 @@
   const GROUPS = [{ t: "Сквозная задача 18–22", ns: [18, 19, 20, 21, 22], m: 45, link: "exam/18" }, { t: "ОДДС и ОФР, задания 10 и 17", ns: [10, 17], m: 16, link: "exam/10" }, { t: "Уравнение и капитал, задания 7, 8, 16", ns: [7, 8, 16], m: 14, link: "exam/7" }, { t: "Запасы, задания 11 и 12", ns: [11, 12], m: 12, link: "exam/11" }, { t: "Основные средства, задание 13", ns: [13], m: 8, link: "exam/13" }, { t: "Вложения и кредит, задания 14 и 15", ns: [14, 15], m: 12, link: "exam/14" }, { t: "Тестовая часть, задания 1–6 и 9", ns: [1, 2, 3, 4, 5, 6, 9], m: 14, link: "exam/1" }];
   function planItems() {
     const out = [], used = new Set(), fast = S.planMode === "fast";
-    GROUPS.forEach((g) => {
-      const ls = []; g.ns.forEach((n) => (LINKS[n] || []).forEach((l) => { if (!used.has(l.id)) { used.add(l.id); ls.push(l); } }));
-      if (!fast) ls.sort((a, b) => a.idx - b.idx).forEach((l) => out.push({ kind: "lesson", l, title: l.title, min: l.minutes || 12, link: `l/${l.id}`, state: lessonState(l) }));
-      const solved = g.ns.filter((n) => isOk(`exam.${n}`)).length;
-      out.push({ kind: "exam", title: g.t, min: g.m, link: g.link, state: solved === g.ns.length ? "done" : solved ? "part" : "new" });
-    });
+    const examItem = (g) => { const solved = g.ns.filter((n) => isOk(`exam.${n}`)).length; return { kind: "exam", title: g.t, min: g.m, link: g.link, state: solved === g.ns.length ? "done" : solved ? "part" : "new" }; };
+    if (fast) GROUPS.forEach((g) => { g.ns.forEach((n) => (LINKS[n] || []).forEach((l) => used.add(l.id))); out.push(examItem(g)); });
+    else { // полный маршрут идёт по порядку уроков, задание контрольной встаёт после последнего урока, который к нему готовит
+      const ls = [], last = GROUPS.map((g) => Math.max(-1, ...g.ns.flatMap((n) => (LINKS[n] || []).map((l) => l.idx))));
+      GROUPS.forEach((g) => g.ns.forEach((n) => (LINKS[n] || []).forEach((l) => { if (!used.has(l.id)) { used.add(l.id); ls.push(l); } })));
+      GROUPS.forEach((g, gi) => { if (last[gi] < 0) out.push(examItem(g)); });
+      ls.sort((a, b) => a.idx - b.idx).forEach((l) => { out.push({ kind: "lesson", l, title: l.title, min: l.minutes || 12, link: `l/${l.id}`, state: lessonState(l) }); GROUPS.forEach((g, gi) => { if (last[gi] === l.idx) out.push(examItem(g)); }); });
+    }
     const hist = S.mock.history.length;
     out.push({ kind: "tool", title: "Собрать отчёты по задаче контрольной своими руками", min: 40, link: "reports", state: S.formsDone.base ? "done" : "new" });
     out.push({ kind: "mock", title: "Первая пробная контрольная", min: 90, link: "mock", state: hist >= 1 ? "done" : "new" });
@@ -325,17 +327,17 @@
   const DP_KIND = { lesson: "Урок", exam: "Контрольная", bank: "Банк", train: "Тренажёр", case: "Тренажёр", variant: "Вариант", mistakes: "Ошибки", open: "Своими словами", notes: "Спорные места", cheat: "Шпаргалка", cards: "Карточки", reports: "Бланки", schemes: "Схемы" };
   const varDone = (v) => S.mock.history.some((r) => r.mode === "var" && r.v === v);
   function dpItem(d, it, i) {
-    let title = it.title || "", min = it.min || 10, link = "", auto = null, hint = "", key = `dp.${d.date}.${i}`;
+    let title = it.title || "", min = it.min || 10, link = "", auto = null, hint = "", key = `dp.${d.date}.${it.t}.${it.id || (it.ns || []).join("-") || it.v || it.n || (it.ids || []).join("-") || it.mod || i}`;
     const cnt = (s, need) => { hint = `${Math.min(s, need)} из ${need}`; return s >= need ? "done" : s ? "part" : "new"; };
     if (it.t === "lesson") { const l = LMAP[it.id]; title = l ? l.title : it.id; min = (l && l.minutes) || 12; link = `l/${it.id}`; auto = l ? lessonState(l) : "new"; key = it.id; }
-    else if (it.t === "exam") { link = `exam/${it.ns[0]}`; auto = cnt(it.ns.filter((n) => isOk(`exam.${n}`)).length, it.ns.length); }
+    else if (it.t === "exam") { link = `exam/${it.ns[0]}`; if (!it.title) { const tk = TASKS[it.ns[0] - 1]; title = it.ns.length === 1 ? `Задание ${tk.n} с контрольной: ${/^[А-ЯЁA-Z][а-яёa-z]/.test(tk.topic) ? tk.topic[0].toLowerCase() + tk.topic.slice(1) : tk.topic}` : `Задания ${it.ns.join(", ")} с контрольной`; } if (!it.min) min = it.ns.length === 1 ? 8 : 8 * it.ns.length; auto = cnt(it.ns.filter((n) => isOk(`exam.${n}`)).length, it.ns.length); }
     else if (it.t === "bank") { link = `bank/${it.n}`; auto = cnt(bankDone(it.n), it.count); }
     else if (it.t === "train" || it.t === "case") { const id = it.id || "case"; link = `train/${id}`; auto = cnt((S.train[id] || {}).ok || 0, it.count || 1); }
     else if (it.t === "variant") { link = `v/${it.v}`; auto = varDone(it.v) ? "done" : "new"; }
     else if (it.t === "open") { link = "bank/open"; auto = cnt(OPENQ.filter((o) => isOk(`open.${o.id}`)).length, it.count || 10); }
     else if (it.t === "reports") { link = "reports"; auto = S.formsDone.base ? "done" : "new"; }
     else if (it.t === "mistakes") { link = "mistakes"; const v = d.items.find((x) => x.t === "variant"); if (v && varDone(v.v) && !mistakes().length) auto = "done"; }
-    else link = { notes: "notes", cheat: "cheat", cards: "cards", schemes: "schemes" }[it.t] || "";
+    else link = it.t === "cards" && it.mod ? `cards/${it.mod}` : { notes: "notes", cheat: "cheat", cards: "cards", schemes: "schemes" }[it.t] || "";
     const man = !!S.manual[key], state = man || auto === "done" ? "done" : auto === "part" ? "part" : "new";
     return { key, title, min, link, state, man, auto, hint, kind: DP_KIND[it.t] || "", date: d.date, l: it.t === "lesson" ? LMAP[it.id] : null, schemes: it.t === "schemes" ? (it.ids || []).map((id) => SCHEMES.find((x) => x.id === id)).filter(Boolean) : null };
   }
@@ -356,7 +358,7 @@
     const list = dpItems(cur), done = list.filter((x) => x.state === "done").length, total = list.reduce((a, x) => a + x.min, 0);
     const behind = cur.date >= t ? dpBehind(cur.date > t ? t : cur.date) : [];
     const allDone = DP.days.every((d) => dpItems(d).every((x) => x.state === "done"));
-    return `${crumbs([["", "Главная"], ["", "План"]])}<div class="pagehead"><div><h1 class="h-xl">План до контрольной</h1><p class="muted" style="margin-top:10px;max-width:62ch">${left != null && left > 0 ? `${plural(left, "Остался", "Осталось", "Осталось")} ${left} ${plural(left, "день", "дня", "дней")}. ` : left === 0 ? "Контрольная сегодня. " : ""}Сначала сквозная задача 18–22, она даёт 5 заданий из 22, потом расчёты, тестовая часть и два варианта на время. Уроки и задания отмечаются сами, когда решишь их; остальное отмечай кружком слева.</p></div></div>
+    return `${crumbs([["", "Главная"], ["", "План"]])}<div class="pagehead"><div><h1 class="h-xl">План до контрольной</h1><p class="muted" style="margin-top:10px;max-width:62ch">${left != null && left > 0 ? `${plural(left, "Остался", "Осталось", "Осталось")} ${left} ${plural(left, "день", "дня", "дней")}. ` : left === 0 ? "Контрольная сегодня. " : ""}План рассчитан на старт с нуля: темы идут по порядку, и каждое новое слово объясняется раньше, чем встречается в задачах. Задание контрольной стоит сразу после урока, который к нему готовит. Уроки и задания отмечаются сами, когда решишь их; остальное отмечай кружком слева. Время указано примерно: если тема идёт тяжело, лучше понять, чем пролистать.</p></div></div>
     ${planTabs("days")}
     <div class="dp-strip" role="list">${tiles}</div>
     <section class="dp-card ${cur.date === DP.exam ? "mesh mesh-pink" : "white"}">
@@ -687,7 +689,7 @@
       body = `<div class="plan-day today"><h3>Порядок подготовки<span class="tag">примерно ${Math.round(totalMin / 6) / 10} ч</span></h3>${items.filter((i) => i.state !== "done").map(planRow).join("")}</div>`;
     }
     const fast = S.planMode === "fast", perDay = days ? totalMin / days / 60 : 0;
-    return `${crumbs([["", "Главная"], ["", "План"]])}<div class="pagehead"><div><h1 class="h-xl">${dpActive() ? "Свой маршрут" : "План подготовки"}</h1><p class="muted" style="margin-top:10px;max-width:60ch">Порядок идёт от веса заданий: сначала сквозная задача 18–22, потом расчёты, в конце тестовая часть и пробные.</p></div></div>
+    return `${crumbs([["", "Главная"], ["", "План"]])}<div class="pagehead"><div><h1 class="h-xl">${dpActive() ? "Свой маршрут" : "План подготовки"}</h1><p class="muted" style="margin-top:10px;max-width:60ch">Полный маршрут идёт по порядку уроков, с нуля: каждое задание контрольной стоит после уроков, которые к нему готовят. Короткий маршрут только по заданиям: сначала сквозная задача 18–22, потом расчёты и тестовая часть.</p></div></div>
     ${dpActive() ? planTabs("auto") : ""}<div class="chips" style="margin-bottom:12px;align-items:center"><button class="chip ${fast ? "" : "on"}" data-act="plan-mode" data-mode="full">Полный маршрут: все уроки</button><button class="chip ${fast ? "on" : ""}" data-act="plan-mode" data-mode="fast">Короткий: только контрольная и пробные</button></div>
     ${!fast && perDay > 5 ? `<div class="b-note exam" style="margin-bottom:14px"><b>Времени мало</b><span>При этой дате полный маршрут требует примерно ${Math.round(perDay)} ч в день. Переключись на короткий: разборы всех 22 заданий, бланки отчётов и две пробные.</span></div>` : ""}
     <div class="glass" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:16px;border-radius:24px"><label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="small">Дата контрольной</span><input type="date" class="num" style="width:auto;padding:7px 12px" data-inp="examDate" value="${esc(S.examDate)}"></label><span class="small muted">Сделано ${done} из ${core.length} шагов</span></div>
