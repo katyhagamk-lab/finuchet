@@ -611,26 +611,230 @@
     <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap"><a class="pill ink" href="#/variants">К вариантам</a><a class="pill" href="#/mock">Пробная</a><a class="pill" href="#/mistakes">Работа над ошибками</a></div>`;
   }
 
-  /* ---------- Отчёты ---------- */
+  /* ---------- Отчёты: рабочее место (условие рядом с бланком, вкладки, подсказки к строкам) ---------- */
+  const RP_FORMS = [["pl", "ОФР"], ["cf", "ОДДС"], ["bs", "Баланс"]];
+  const RP = { F: null, key: "", fk: "pl", by: {}, opKeys: [], focus: null, calcOpen: {}, col: 1 };
+  const rpLearn = () => S.forms.mode !== "exam";
+  const rpData = () => (S.forms[RP.key] = S.forms[RP.key] || {});
+  const rpOps = () => (S.forms["ops:" + RP.key] = S.forms["ops:" + RP.key] || {});
+  const rpNarrow = () => window.matchMedia("(max-width:1099px)").matches;
+  /* Число или выражение из ячейки: 45000+350000−52000, (5 000), −5 000, 1,6×100 */
+  function evalExpr(raw) {
+    let s = String(raw == null ? "" : raw).replace(/[\s  ]/g, "").replace(/[−–—]/g, "-").replace(/[×xх*]/gi, "*").replace(/[÷:]/g, "/").replace(/,/g, ".");
+    if (s[0] === "=") s = s.slice(1);
+    if (!s || !/^[0-9+\-*/().]+$/.test(s)) return NaN;
+    const acc = s.match(/^\(([0-9.]+)\)$/); if (acc) return -(+acc[1]);
+    let i = 0;
+    const expr = () => { let v = term(); while (s[i] === "+" || s[i] === "-") { const op = s[i++], r = term(); v = op === "+" ? v + r : v - r; } return v; };
+    const term = () => { let v = factor(); while (s[i] === "*" || s[i] === "/") { const op = s[i++], r = factor(); v = op === "*" ? v * r : v / r; } return v; };
+    const factor = () => { if (s[i] === "-") { i++; return -factor(); } if (s[i] === "+") { i++; return factor(); } if (s[i] === "(") { i++; const v = expr(); if (s[i++] !== ")") throw 0; return v; } const m = s.slice(i).match(/^\d+(\.\d+)?/); if (!m) throw 0; i += m[0].length; return +m[0]; };
+    try { const v = expr(); return i === s.length && isFinite(v) ? Math.round(v * 100) / 100 : NaN; } catch (e) { return NaN; }
+  }
+  const rpShow = (raw) => { const s = String(raw == null ? "" : raw).trim(); if (!s) return ""; const v = evalExpr(s); return isNaN(v) ? s : G.fmt(v); };
+  const rpIsExpr = (raw) => /\d\s*[-−+*×x÷/]\s*[\d(]/.test(String(raw == null ? "" : raw).replace(/\s(?=\d{3}\b)/g, ""));
+  function rpOk(r, ci, raw) { const v = evalExpr(raw); if (isNaN(v)) return false; const a = r.v[ci]; return r.abs ? Math.abs(Math.abs(v) - Math.abs(a)) < 1e-6 : Math.abs(v - a) < 1e-6; }
+  function rpOwnSum(fk, r, ci) { const d = rpData(), missing = []; let v = 0; r.f.forEach(([k, sg]) => { const it = RP.by[fk][k], x = evalExpr(d[`${fk}.${it.ri}.${ci}`]); if (isNaN(x)) missing.push(it.r.l); else v += sg < 0 ? -Math.abs(x) : x; }); return { v, missing }; }
+  function rpSumCalc(fk, r, ci) {
+    if (!r.f.length) return { nums: "0", labels: "Таких операций в задаче нет" };
+    const parts = r.f.map(([k, sg], i) => { const x = RP.by[fk][k].r.v[ci], v = sg < 0 ? -Math.abs(x) : x; return i === 0 ? G.fmt(v) : (v < 0 ? " − " : " + ") + G.fmt(Math.abs(v)); });
+    const labels = r.f.map(([k, sg], i) => (i === 0 ? "" : sg < 0 ? " − " : " + ") + RP.by[fk][k].r.l).join("");
+    return { nums: parts.join("") + " = " + G.fmt(r.v[ci]), labels };
+  }
+  function rpStat(fk) { const f = RP.F[fk], d = rpData(); let total = 0, filled = 0, ok = 0; f.rows.forEach((r, ri) => { if (!r.v) return; r.v.forEach((_, ci) => { total++; const raw = d[`${fk}.${ri}.${ci}`]; if (raw != null && String(raw).trim()) { filled++; if (rpOk(r, ci, raw)) ok++; } }); }); return { total, filled, ok, done: !!S.formsDone[RP.key + fk] }; }
+  function rpMarkDone(fk) { S.formsDone[RP.key + fk] = true; if (RP.key === "base" && RP_FORMS.every(([k]) => S.formsDone["base" + k])) S.formsDone.base = true; save(); }
+  const rpAllDone = () => RP_FORMS.every(([k]) => S.formsDone[RP.key + k]);
+
   function viewReports() {
-    const seed = S.forms.seed || 0, isBase = !seed, p = isBase ? G.CASE_BASE : G.seedCase(seed), s = G.solveCase(p), F = G.forms(s), key = isBase ? "base" : "s" + seed, saved = S.forms[key] || {};
+    const seed = S.forms.seed || 0, isBase = !seed, p = isBase ? G.CASE_BASE : G.seedCase(seed), s = G.solveCase(p), learn = rpLearn();
+    RP.F = G.forms(s); RP.key = isBase ? "base" : "s" + seed; RP.opKeys = G.caseOpKeys(p); RP.focus = null; RP.calcOpen = {}; RP.by = {};
+    Object.entries(RP.F).forEach(([fk, f]) => { RP.by[fk] = {}; f.rows.forEach((r, ri) => { if (r.k) RP.by[fk][r.k] = { r, ri }; }); });
+    if (!RP_FORMS.some(([k]) => k === S.forms.tab)) S.forms.tab = "pl";
+    RP.fk = S.forms.tab;
+    window.__forms = RP.F; window.__formsKey = RP.key;
     const cond = isBase ? EX.tasks[17].cond.slice(0, -1) : G.caseCond(p, s);
-    const form = (fk, f) => `<div style="margin-bottom:20px" data-form="${fk}"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px;flex-wrap:wrap"><h2 class="h-md">${esc(f.title)}</h2><div style="display:flex;gap:6px"><button class="pill" data-act="form-check" data-form="${fk}">Проверить</button><button class="pill ghost" data-act="form-show" data-form="${fk}">Показать ответы</button></div></div><div class="statement"><table><thead><tr><th>Показатель</th>${f.cols.map((c) => `<th class="r">${esc(c)}</th>`).join("")}</tr></thead><tbody>${f.rows.map((r, ri) => (r.sec ? `<tr class="sec"><td colspan="${f.cols.length + 1}">${esc(r.sec)}</td></tr>` : `<tr class="${r.sum ? "sum" : ""}"><td>${esc(r.l)}</td>${r.v.map((v, ci) => `<td class="r"><input aria-label="${esc(r.l)}" inputmode="text" autocomplete="off" data-cell="${fk}.${ri}.${ci}" value="${esc(saved[`${fk}.${ri}.${ci}`] || "")}"><span class="exp" hidden></span></td>`).join("")}</tr>`)).join("")}</tbody></table></div><div class="fb-slot"></div></div>`;
-    window.__forms = F; window.__formsKey = key;
     return `${crumbs([["", "Главная"], ["exam", "Контрольная"], ["", "Отчёты"]])}
-    <div class="pagehead"><div><h1 class="h-xl">Собери отчёты сам</h1><p class="muted" style="margin-top:10px;max-width:60ch">Те же бланки, что на контрольной. Заполняй по порядку: ОФР, ОДДС, потом баланс. Расходы и платежи можно писать без минуса, итоговое сальдо и убыток со знаком.</p></div></div>
-    <div class="chips" style="margin-bottom:16px"><button class="chip ${isBase ? "on" : ""}" data-act="form-base">Задача с контрольной</button><button class="chip ${isBase ? "" : "on"}" data-act="form-new">${isBase ? "Новые числа" : "Другие числа"}</button></div>
-    <details class="case-step" open><summary>Условие задачи</summary><div class="blocks">${renderBlocks(cond)}</div></details>
-    <div style="margin-top:22px">${form("pl", F.pl)}${form("cf", F.cf)}${form("bs", F.bs)}</div>`;
+    <div class="rp-head"><div><h1 class="h-lg">Собери отчёты сам</h1><p class="muted small" style="margin-top:6px">Бланки как на контрольной. Порядок: ОФР, ОДДС, потом баланс.</p></div>
+      <div class="rp-tools"><div class="seg rp-seg" role="group" aria-label="Задача"><button class="${isBase ? "on" : ""}" data-act="form-base">Задача с контрольной</button><button class="${isBase ? "" : "on"}" data-act="form-new">${isBase ? "Новые числа" : "Другие числа"}</button></div>
+      <div class="seg rp-seg" role="group" aria-label="Режим"><button class="${learn ? "on" : ""}" data-act="rp-mode" data-mode="learn" aria-pressed="${learn}">С подсказками</button><button class="${learn ? "" : "on"}" data-act="rp-mode" data-mode="exam" aria-pressed="${!learn}">Как на контрольной</button></div></div></div>
+    <div class="rp ${learn ? "learn" : "exam"}" id="rp">
+      <aside class="rp-side" id="rp-side" aria-label="Условие задачи">${learn ? `<div class="rp-hint-side" id="rp-hint-side" aria-live="polite">${rpHintIdle()}</div>` : ""}<div class="rp-cond" id="rp-cond">${rpCond(cond)}</div></aside>
+      <section class="rp-work"><div class="rp-bar"><nav class="rp-tabs" role="tablist" aria-label="Отчёты" id="rp-tabs">${rpTabs()}</nav><button class="pill rp-cond-btn" data-act="rp-cond-open" aria-controls="rp-side" aria-label="Условие задачи"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z"/><path d="M14 3.5V8h4M10 12h5M10 15.5h5"/></svg><span>Условие</span></button></div><div id="rp-form" role="tabpanel">${rpForm()}</div></section>
+    </div><div class="rp-scrim" id="rp-scrim" data-act="rp-cond-close" hidden></div>`;
   }
-  function cellOk(rowDef, ci, str) { const v = parseNum(str); if (isNaN(v)) return false; const a = rowDef.v[ci]; return rowDef.abs ? Math.abs(Math.abs(v) - Math.abs(a)) < 1e-9 : Math.abs(v - a) < 1e-9; }
-  function formCheck(fk, reveal) {
-    const f = window.__forms[fk], root = $(`[data-form="${fk}"]`); let total = 0, ok = 0;
-    $$("input[data-cell]", root).forEach((inp) => { const [, ri, ci] = inp.dataset.cell.split("."), r = f.rows[+ri], good = cellOk(r, +ci, inp.value), exp = inp.parentElement.querySelector(".exp"); total++; if (good) ok++; inp.classList.toggle("right", good); inp.classList.toggle("wrong", !good && inp.value.trim() !== ""); if (reveal && !good) { exp.hidden = false; exp.textContent = G.br(r.v[+ci]); } else exp.hidden = true; });
-    const slot = root.querySelector(".fb-slot");
-    slot.innerHTML = reveal ? "" : `<div class="fb ${ok === total ? "ok" : "bad"}"><b>${ok === total ? "Всё сошлось" : `Верно ${ok} из ${total}`}</b>${ok === total ? (fk === "bs" ? "Актив равен пассиву, отчёт собран верно." : "Переходи к следующему отчёту.") : "Красным отмечены неверные строки, пустые пока не считаются."}</div>`;
-    if (ok === total && !reveal) { S.formsDone[window.__formsKey + fk] = true; if (window.__formsKey === "base" && ["pl", "cf", "bs"].every((k) => S.formsDone["base" + k])) S.formsDone.base = true; save(); }
+  const rpHintIdle = () => `<p class="rp-idle"><b>Подсказка к строке</b>Встань в любую ячейку: здесь появится, откуда берётся число, а в условии подсветятся нужные пункты.</p>`;
+  function rpCond(cond) {
+    const ops = rpOps(); let li = 0;
+    const body = cond.map((b) => {
+      if (b.t === "p") return `<p class="rp-p">${md(b.text)}</p>`;
+      if (b.t === "table") return `<div class="rp-osv"><table><thead><tr>${b.head.map((h, i) => `<th class="${i > 1 ? "r" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${b.rows.map((r) => `<tr data-acc="${esc(String(r[0]).trim())}">${r.map((c, i) => `<td class="${i > 1 ? "r" : ""}">${md(String(c))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+      if (b.t === "list") return `<ol class="rp-ops">${b.items.map((it) => { const i = li++, k = RP.opKeys[i] || "op" + i, done = !!ops[k]; return `<li data-op="${k}" class="${done ? "done" : ""}"><button class="op-chk" data-act="rp-op" data-op="${k}" aria-pressed="${done}" aria-label="Пункт ${i + 1} учтён">${ICON.check}</button><span class="op-n">${i + 1}</span><span class="op-t">${md(it)}</span></li>`; }).join("")}</ol>`;
+      return renderBlocks([b]);
+    }).join("");
+    return `<div class="rp-cond-head"><b>Условие</b><span class="tiny faint" id="rp-ops-n">${rpOpsLabel()}</span><button class="round sm rp-x" data-act="rp-cond-close" aria-label="Закрыть условие">${ICON.x}</button></div>${body}`;
   }
+  function rpOpsLabel() { const o = rpOps(), n = RP.opKeys.filter((k) => o[k]).length; return `отмечено ${n} из ${RP.opKeys.length}`; }
+  function rpTabs() {
+    return RP_FORMS.map(([fk, short], i) => { const st = rpStat(fk), on = fk === RP.fk, pct = Math.round((st.filled / st.total) * 100);
+      return `<button class="rp-tab${on ? " on" : ""}${st.done ? " done" : ""}" role="tab" aria-selected="${on}" data-act="rp-tab" data-fk="${fk}"><span class="rp-tab-n">${st.done ? ICON.check : i + 1}</span><span class="rp-tab-t"><b>${short}</b><small>${st.done ? "сошлось" : `${st.filled} из ${st.total}`}</small></span><i class="rp-tab-bar" aria-hidden="true"><i style="width:${st.done ? 100 : pct}%"></i></i></button>`; }).join("");
+  }
+  function rpForm() {
+    const fk = RP.fk, f = RP.F[fk], d = rpData(), learn = rpLearn(), two = f.cols.length > 1, idx = RP_FORMS.findIndex(([k]) => k === fk), next = RP_FORMS[idx + 1];
+    const tip = fk === "pl" ? "Расходы можно писать без минуса, убыток со знаком минус." : fk === "cf" ? "Платежи можно без минуса, отрицательное сальдо со знаком минус." : "Начни с колонки «на начало года»: всё берётся из сальдовой ведомости.";
+    const rows = f.rows.map((r, ri) => r.sec ? `<tr class="sec"><td class="rp-code"></td><td colspan="${f.cols.length + 1}">${esc(r.sec)}</td></tr>`
+      : `<tr class="rp-row${r.sum ? " sum" : ""}" data-ri="${ri}"><td class="rp-code">${esc(r.code || "")}</td><td class="rp-label"><span>${esc(r.l)}</span>${learn ? `<button class="rp-q" data-act="rp-q" data-ri="${ri}" tabindex="-1" aria-label="Подсказка: ${esc(r.l)}">?</button>` : ""}</td>${r.v.map((_, ci) => rpCell(fk, f, r, ri, ci, d, learn)).join("")}</tr>`).join("");
+    const colsw = two ? `<div class="seg rp-colsw" role="group" aria-label="Колонка баланса">${[1, 0].map((c) => `<button class="${RP.col === c ? "on" : ""}" data-act="rp-col" data-col="${c}" aria-pressed="${RP.col === c}">${esc(f.cols[c])}</button>`).join("")}</div>` : "";
+    return `<div class="rp-fhead"><h2 class="h-md">${esc(f.title)}</h2><p class="tiny muted">тыс. руб. ${tip}</p></div>${colsw}
+    <div class="statement rp-table${two ? " two" : ""}" data-col="${RP.col}"><table><thead><tr><th class="rp-code">Код</th><th>Показатель</th>${f.cols.map((c, ci) => `<th class="r c${ci}">${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="rp-actions"><button class="pill ink" data-act="rp-check">Проверить отчёт</button><button class="pill ghost" data-act="rp-show">Показать ответы</button><button class="pill ghost" data-act="rp-clear">Очистить</button>${next ? `<button class="pill rp-next" data-act="rp-tab" data-fk="${next[0]}">Дальше: ${next[1]} ${ICON.next}</button>` : ""}</div>
+    <div class="fb-slot" id="rp-fb">${rpAllDone() ? rpDoneFb() : ""}</div>
+    <p class="rp-keys tiny faint">Enter — следующая строка, ↑ ↓ — по строкам. Считать можно прямо в ячейке: 45000+350000−52000.${learn ? " Σ в итоговой строке сложит твои строки выше." : ""}</p>`;
+  }
+  function rpCell(fk, f, r, ri, ci, d, learn) {
+    const id = `${fk}.${ri}.${ci}`, raw = d[id] || "", st = learn && String(raw).trim() ? (rpOk(r, ci, raw) ? "right" : "wrong") : "", sig = learn && r.f;
+    return `<td class="r rp-cell c${ci}"><div class="cellbox${sig ? " has-sum" : ""}${st ? " " + st : ""}">${sig ? `<button class="sigma" data-act="rp-sum" data-cell="${id}" tabindex="-1" title="Сложить мои строки" aria-label="Сложить мои строки">Σ</button>` : ""}<input data-cell="${id}" value="${esc(rpShow(raw))}"${rpIsExpr(raw) ? ` title="${esc(raw)}"` : ""} inputmode="text" enterkeyhint="next" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="${esc(r.l)}, ${esc(f.cols[ci])}"${st === "wrong" ? ' aria-invalid="true"' : ""}><i class="cell-st" aria-hidden="true"></i></div><span class="exp" hidden></span></td>`;
+  }
+  const rpDoneFb = () => `<div class="fb ok"><b>Все три отчёта сошлись</b>Можно закрепить на новых числах: задача та же, суммы другие. <button class="pill" style="margin-top:10px" data-act="form-new">Новые числа</button></div>`;
+  function rpHintHTML(fk, ri, ci) {
+    const f = RP.F[fk], r = f.rows[ri], id = `${fk}.${ri}.${ci}`, raw = rpData()[id] || "", has = String(raw).trim() !== "";
+    let st = "";
+    if (has) {
+      const v = evalExpr(raw);
+      if (isNaN(v)) st = `<p class="rp-st bad">Не получается прочитать число. Пиши цифры и знаки + − × ÷.</p>`;
+      else if (rpOk(r, ci, raw)) st = `<p class="rp-st ok">${ICON.check}Верно${rpIsExpr(raw) ? `: ${esc(raw)} = ${G.fmt(v)}` : ""}</p>`;
+      else if (r.f) { const own = rpOwnSum(fk, r, ci); st = `<p class="rp-st bad">${own.missing.length ? `Пока неверно. Заполни строки, из которых складывается итог: ${own.missing.map(esc).join(", ")}.` : Math.abs(own.v - v) < 1e-6 ? "Сложено верно, ошибка в строках выше: проверь их." : `Пересчитай: по твоим строкам выходит ${G.fmt(own.v)}.`}</p>`; }
+      else st = `<p class="rp-st bad">Пока неверно${rpIsExpr(raw) ? ` (${esc(raw)} = ${G.fmt(v)})` : ""}. Посмотри, откуда берётся число.</p>`;
+    }
+    const where = [];
+    if (r.osv && r.osv.length) where.push(`${r.osv.length > 1 ? "счета" : "счёт"} ${r.osv.join(", ")}`);
+    const opsN = (r.ops || []).map((k) => RP.opKeys.indexOf(k) + 1).filter((x) => x > 0);
+    if (opsN.length) where.push(`${opsN.length > 1 ? "пункты" : "пункт"} ${opsN.join(", ")}`);
+    if (r.f) where.push("строки этого отчёта выше");
+    const sc = r.f ? rpSumCalc(fk, r, ci) : null, open = !!RP.calcOpen[id];
+    const calc = open ? `<div class="rp-calc"><span class="tiny muted">Расчёт</span><div class="rp-calc-v">${md(sc ? sc.nums : r.calc[ci])}</div>${sc ? `<span class="tiny muted">${esc(sc.labels)}</span>` : ""}</div>` : "";
+    return `<div class="rp-hint-top"><span class="tag">${esc(r.code || "")}</span><b>${esc(r.l)}</b>${f.cols.length > 1 ? `<span class="tiny faint">${esc(f.cols[ci].toLowerCase())}</span>` : ""}</div>
+      <p class="rp-why">${md(r.why || "")}</p>${where.length ? `<p class="rp-where tiny muted">Где смотреть: ${where.join(" · ")}</p>` : ""}${st}${calc}
+      <div class="rp-hint-acts">${open ? "" : `<button class="pill ghost sm" data-act="rp-calc" data-id="${id}">Показать расчёт</button>`}${opsN.length || (r.osv && r.osv.length) ? `<button class="pill ghost sm rp-see" data-act="rp-cond-open">Открыть условие</button>` : ""}</div>`;
+  }
+  function rpPaintHint() {
+    if (!rpLearn() || !$("#rp")) return;
+    const old = $("#rp-form .rp-hint-row"), side = $("#rp-hint-side");
+    if (!RP.focus || RP.focus.fk !== RP.fk) { if (old) old.remove(); if (side) side.innerHTML = rpHintIdle(); return; }
+    const { fk, ri, ci } = RP.focus, html = rpHintHTML(fk, ri, ci);
+    if (rpNarrow()) {
+      const tr = $(`#rp-form tr[data-ri="${ri}"]`); if (!tr) return;
+      let row = old; if (!row || row.previousElementSibling !== tr) { if (old) old.remove(); row = document.createElement("tr"); row.className = "rp-hint-row"; row.innerHTML = `<td colspan="${RP.F[fk].cols.length + 2}"><div class="rp-hint-in" aria-live="polite"></div></td>`; tr.after(row); }
+      row.querySelector(".rp-hint-in").innerHTML = html;
+    } else { if (old) old.remove(); if (side) side.innerHTML = html; }
+  }
+  function rpHighlight(r) {
+    $$("#rp-cond .hl").forEach((x) => x.classList.remove("hl"));
+    if (!r || !rpLearn()) return;
+    (r.ops || []).forEach((k) => { const el = $(`#rp-cond li[data-op="${k}"]`); if (el) el.classList.add("hl"); });
+    (r.osv || []).forEach((a) => { const el = $(`#rp-cond tr[data-acc="${a}"]`); if (el) el.classList.add("hl"); });
+    const box = $("#rp-cond"), first = $("#rp-cond .hl");
+    if (!box || !first || (rpNarrow() && !$("#rp-side.open"))) return;
+    const b = box.getBoundingClientRect(), e = first.getBoundingClientRect(), head = 52;
+    if (e.top < b.top + head || e.bottom > b.bottom - 12) box.scrollTo({ top: box.scrollTop + e.top - b.top - head - 8, behavior: "smooth" });
+  }
+  function rpFocus(inp) {
+    const [fk, ri, ci] = inp.dataset.cell.split("."), r = RP.F[fk].rows[+ri];
+    $$("#rp-form tr.cur").forEach((x) => x.classList.remove("cur")); inp.closest("tr").classList.add("cur");
+    RP.focus = { fk, ri: +ri, ci: +ci }; rpHighlight(r); rpPaintHint();
+  }
+  function rpMark(inp, force) {
+    const [fk, ri, ci] = inp.dataset.cell.split("."), r = RP.F[fk].rows[+ri], raw = rpData()[inp.dataset.cell] || "", box = inp.parentElement, has = String(raw).trim() !== "";
+    const show = force || rpLearn(), ok = has && rpOk(r, +ci, raw);
+    box.classList.toggle("right", show && ok); box.classList.toggle("wrong", show && has && !ok);
+    if (show && has && !ok) inp.setAttribute("aria-invalid", "true"); else inp.removeAttribute("aria-invalid");
+    const exp = box.parentElement.querySelector(".exp"); if (exp && ok) exp.hidden = true;
+  }
+  function rpCommit(inp) {
+    const id = inp.dataset.cell, raw = inp.value.trim(), same = inp.dataset.orig != null && raw === String(inp.dataset.orig).trim(); delete inp.dataset.orig;
+    if (same) { inp.value = rpShow(raw); return; }
+    rpData()[id] = raw; save();
+    inp.value = rpShow(raw); if (rpIsExpr(raw)) inp.title = raw; else inp.removeAttribute("title");
+    rpMark(inp); rpAfterChange();
+  }
+  function rpAfterChange() {
+    const tabs = $("#rp-tabs"); if (tabs) tabs.innerHTML = rpTabs();
+    if (rpLearn()) { const st = rpStat(RP.fk); if (st.ok === st.total && !st.done) { rpMarkDone(RP.fk); if (tabs) tabs.innerHTML = rpTabs(); rpFb(RP.fk, st); toast(`${RP_FORMS.find(([k]) => k === RP.fk)[1]}: всё сошлось`); } }
+    if (RP.focus) rpPaintHint();
+  }
+  function rpFb(fk, st) {
+    const slot = $("#rp-fb"); if (!slot) return;
+    if (st.ok === st.total) { slot.innerHTML = rpAllDone() ? rpDoneFb() : `<div class="fb ok"><b>Отчёт сошёлся</b>${fk === "bs" ? "Актив равен пассиву." : "Переходи к следующему отчёту."}</div>`; return; }
+    const empty = st.total - st.filled;
+    slot.innerHTML = `<div class="fb bad"><b>Верно ${st.ok} из ${st.total}</b>${empty ? `Не заполнено ячеек: ${empty}. ` : ""}Неверные отмечены красным${rpLearn() ? ": встань в такую ячейку, и появится подсказка" : ""}.</div>`;
+  }
+  function rpCheck(reveal) {
+    const fk = RP.fk, f = RP.F[fk], d = rpData();
+    $$("#rp-form input[data-cell]").forEach((inp) => {
+      rpMark(inp, true);
+      const [, ri, ci] = inp.dataset.cell.split("."), r = f.rows[+ri], exp = inp.parentElement.parentElement.querySelector(".exp"), ok = rpOk(r, +ci, d[inp.dataset.cell]);
+      if (reveal && !ok) { exp.hidden = false; exp.textContent = `верно: ${G.fmt(r.v[+ci])}`; } else if (exp) exp.hidden = true;
+    });
+    const st = rpStat(fk);
+    if (reveal) { $("#rp-fb").innerHTML = `<div class="fb hint"><b>Ответы под ячейками</b>Перепиши их и разберись по подсказкам, откуда каждое число.</div>`; return; }
+    if (st.ok === st.total && !st.done) rpMarkDone(fk);
+    $("#rp-tabs").innerHTML = rpTabs(); rpFb(fk, st);
+  }
+  function rpSetTab(fk) {
+    S.forms.tab = fk; RP.fk = fk; RP.focus = null; save();
+    $("#rp-form").innerHTML = rpForm(); $("#rp-tabs").innerHTML = rpTabs(); rpHighlight(null); rpPaintHint();
+    const bar = $(".rp-bar"); if (bar && bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ block: "start" });
+    if (!rpNarrow()) { const first = $$("#rp-form input[data-cell]").find((x) => !x.value) || $("#rp-form input[data-cell]"); if (first) first.focus({ preventScroll: true }); }
+  }
+  function rpSetCol(c, focus) {
+    RP.col = c ? 1 : 0; const t = $("#rp-form .rp-table"); if (t) t.dataset.col = RP.col;
+    $$("#rp-form [data-act='rp-col']").forEach((b) => { const on = +b.dataset.col === RP.col; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+    if (focus) { const first = $$(`#rp-form input[data-cell$=".${RP.col}"]`).find((x) => !x.value); if (first) first.focus(); }
+  }
+  function rpCondOpen(open) {
+    const side = $("#rp-side"), scrim = $("#rp-scrim"); if (!side) return;
+    side.classList.toggle("open", open); if (scrim) scrim.hidden = !open;
+    if (open) { if (RP.focus) rpHighlight(RP.F[RP.focus.fk].rows[RP.focus.ri]); const x = $("#rp-side .rp-x"); if (x) x.focus({ preventScroll: true }); }
+  }
+  function rpAct(act, ac) {
+    if (act === "rp-tab") rpSetTab(ac.dataset.fk);
+    else if (act === "rp-mode") { S.forms.mode = ac.dataset.mode === "exam" ? "exam" : "learn"; save(); route(); }
+    else if (act === "rp-op") { const o = rpOps(), k = ac.dataset.op; o[k] = o[k] ? 0 : 1; save(); const li = ac.closest("li"); li.classList.toggle("done", !!o[k]); ac.setAttribute("aria-pressed", String(!!o[k])); const n = $("#rp-ops-n"); if (n) n.textContent = rpOpsLabel(); }
+    else if (act === "rp-q") { const inp = $(`#rp-form tr[data-ri="${ac.dataset.ri}"] input[data-cell]`); if (inp) inp.focus(); }
+    else if (act === "rp-calc") { RP.calcOpen[ac.dataset.id] = 1; rpPaintHint(); }
+    else if (act === "rp-sum") {
+      const id = ac.dataset.cell, [fk, ri, ci] = id.split("."), r = RP.F[fk].rows[+ri], own = rpOwnSum(fk, r, +ci), inp = $(`#rp-form input[data-cell="${id}"]`);
+      if (own.missing.length) { toast(`Сначала заполни: ${own.missing.join(", ")}`); if (inp) inp.focus(); return; }
+      rpData()[id] = String(own.v); save(); if (inp) { inp.value = G.fmt(own.v); inp.removeAttribute("title"); rpMark(inp); inp.focus(); } rpAfterChange();
+    }
+    else if (act === "rp-check") rpCheck(false);
+    else if (act === "rp-show") rpCheck(true);
+    else if (act === "rp-clear") {
+      if (!ac.dataset.sure) { ac.dataset.sure = "1"; ac.textContent = "Точно очистить?"; setTimeout(() => { if (ac.isConnected) { delete ac.dataset.sure; ac.textContent = "Очистить"; } }, 3500); return; }
+      const d = rpData(); Object.keys(d).forEach((k) => { if (k.startsWith(RP.fk + ".")) d[k] = ""; }); S.formsDone[RP.key + RP.fk] = false; if (RP.key === "base") S.formsDone.base = false; save(); rpSetTab(RP.fk);
+    }
+    else if (act === "rp-col") rpSetCol(+ac.dataset.col, true);
+    else if (act === "rp-cond-open") rpCondOpen(true);
+    else if (act === "rp-cond-close") rpCondOpen(false);
+    else return false;
+    return true;
+  }
+  /* В ячейку вошли — показываем то, что набирали (формулу), и выделяем всё: новое число заменит старое, как в таблицах */
+  document.addEventListener("focusin", (e) => { const t = e.target; if (!t.matches || !t.matches("#rp input[data-cell]")) return; const raw = rpData()[t.dataset.cell]; if (raw && t.value !== raw) t.value = raw; t.dataset.orig = t.value; if (t.value) { t.select(); t.dataset.sel = "1"; } rpFocus(t); });
+  document.addEventListener("mousedown", (e) => { if (e.target.closest && e.target.closest("#rp-hint-side button, .rp-hint-in button, .sigma, .rp-q")) e.preventDefault(); });
+  document.addEventListener("mouseup", (e) => { const t = e.target; if (t.dataset && t.dataset.sel && t.matches("#rp input[data-cell]")) { e.preventDefault(); delete t.dataset.sel; } });
+  document.addEventListener("input", (e) => { if (e.target.dataset && e.target.dataset.sel) delete e.target.dataset.sel; }, true);
+  document.addEventListener("focusout", (e) => { const t = e.target; if (t.matches && t.matches("#rp input[data-cell]") && RP.F) rpCommit(t); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("#rp-side.open")) { rpCondOpen(false); return; }
+    const t = e.target; if (!t.matches || !t.matches("#rp input[data-cell]")) return;
+    const dir = e.key === "Enter" ? (e.shiftKey ? -1 : 1) : e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0; if (!dir) return;
+    e.preventDefault();
+    const ci = t.dataset.cell.split(".")[2], col = $$(`#rp-form input[data-cell$=".${ci}"]`);
+    let next = col[col.indexOf(t) + dir];
+    if (!next && e.key === "Enter" && dir > 0) next = $$(`#rp-form input[data-cell$=".${+ci + 1}"]`)[0];
+    if (next && next.offsetParent === null) rpSetCol(+next.dataset.cell.split(".")[2], false);
+    if (next) { next.focus(); next.select(); } else if (e.key === "Enter") { t.blur(); const b = $('#rp-form [data-act="rp-check"]'); if (b) b.focus(); }
+  });
+  window.addEventListener("resize", () => { if ($("#rp") && RP.focus) rpPaintHint(); if ($("#rp-side.open") && !rpNarrow()) rpCondOpen(false); });
 
   /* ---------- Тренажёры ---------- */
   function viewTrain() {
@@ -994,8 +1198,7 @@
     else if (act === "show-sol") { $("#sol").hidden = false; unlockPhoto(); ac.remove(); $("#sol").scrollIntoView({ behavior: "smooth" }); }
     else if (act === "mock-start") { const mode = ac.dataset.mode, min = +($(mode === "orig" ? "#mock-min-a" : "#mock-min-b").value); S.mock.active = { start: Date.now(), minutes: min, mode, seed: Math.floor(Math.random() * 1e9) + 1, answers: {} }; save(); route(); }
     else if (act === "mock-submit") { submitMock(false); }
-    else if (act === "form-check") formCheck(ac.dataset.form, false);
-    else if (act === "form-show") formCheck(ac.dataset.form, true);
+    else if (act && act.startsWith("rp-")) rpAct(act, ac);
     else if (act === "var-start") { const v = +ac.dataset.v, min = +($("#var-min").value); S.mock.active = { start: Date.now(), minutes: min, mode: "var", v, seed: v, answers: {} }; save(); location.hash = "#/mock"; }
     else if (act === "zoom") { openZoom(ac.dataset.id); }
     else if (act === "acc-create") {
