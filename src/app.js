@@ -155,6 +155,20 @@
   /* ---------- Текст ---------- */
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const md = (s) => esc(s).replace(/(\d) (?=\d{3}(?:\D|$))/g, "$1\u00A0").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+  // Длинный текст со структурой: строки «- …» — пункты списка, строка «**…**» — подзаголовок, прочие строки — абзацы
+  const isRich = (s) => { s = String(s == null ? "" : s); return s.includes("\n") && /(^|\n)(- |\*\*[^*\n]+\*\*:?[ \t]*(\n|$))/.test(s); };
+  const rich = (s) => {
+    if (!isRich(s)) return md(s);
+    let out = "", ul = [];
+    const flush = () => { if (ul.length) { out += `<ul class="rt-ul">${ul.map((x) => `<li>${md(x)}</li>`).join("")}</ul>`; ul = []; } };
+    String(s).split("\n").forEach((ln) => {
+      const t = ln.trim(); if (!t) { flush(); return; }
+      if (t.startsWith("- ")) { ul.push(t.slice(2)); return; }
+      flush(); const h = t.match(/^\*\*([^*]+)\*\*:?$/);
+      out += h ? `<span class="rt-h">${md(h[1])}</span>` : `<span class="rt-p">${md(t)}</span>`;
+    });
+    flush(); return out;
+  };
   const plural = (n, a, b, c) => { const m = Math.abs(n) % 100, k = m % 10; if (m > 10 && m < 20) return c; if (k > 1 && k < 5) return b; if (k === 1) return a; return c; };
   const hash32 = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
   const seeded = (arr, seedStr) => { let x = hash32(seedStr) || 1; const r = () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return (x >>> 0) / 4294967296; }; const a = arr.map((v, i) => ({ v, i })); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -162,23 +176,41 @@
   const fmt = (x) => G.fmt(x);
 
   /* ---------- Блоки контента ---------- */
+  /* Заголовок карточки: первая строка — заголовок, следующие — пояснение под ним */
+  const cardTitle = (s) => { const [t, ...sub] = String(s == null ? "" : s).split("\n"); return `<div class="tc-t">${md(t)}${sub.length ? `<span class="tc-sub">${md(sub.join(" "))}</span>` : ""}</div>`; };
+  /* Таблица с длинным текстом → карточки: каждая строка — карточка, первая ячейка — заголовок */
+  function renderCards(b) {
+    const n = b.head.length, len = b.rows.map((r) => r.slice(1).join(" ").length), avg = len.reduce((a, x) => a + x, 0) / (len.length || 1);
+    const one = b.layout === "list" || (b.layout !== "grid" && (avg > 170 || b.rows.length < 2));
+    return `${b.caption ? `<div class="tbl-cap">${md(b.caption)}</div>` : ""}<div class="tcards${one ? " one" : ""}">${b.rows.map((r) => `<article class="tcard">${cardTitle(r[0])}${r.slice(1).map((c, i) => (String(c).trim() ? `<div class="tc-f">${n > 2 ? `<span class="tc-l">${md(b.head[i + 1])}</span>` : ""}<div class="tc-v">${rich(c)}</div></div>` : "")).join("")}</article>`).join("")}</div>`;
+  }
+  /* Сравнение двух-трёх вариантов: каждый столбец — карточка, признаки (первый столбец) выровнены по строкам */
+  function renderCompare(b) {
+    const cols = b.head.slice(1);
+    return `${b.caption ? `<div class="tbl-cap">${md(b.caption)}</div>` : ""}<div class="tcmp" style="--n:${cols.length}">${cols.map((h, ci) => `<article class="tc-col" style="grid-row:span ${b.rows.length + 1}">${cardTitle(h)}${b.rows.map((r) => `<div class="tc-f">${String(r[0]).trim() ? `<span class="tc-l">${md(r[0])}</span>` : ""}<div class="tc-v">${rich(r[ci + 1])}</div></div>`).join("")}</article>`).join("")}</div>`;
+  }
   function renderTable(b) {
+    if (b.view === "cards") return renderCards(b);
+    if (b.view === "compare") return renderCompare(b);
     const al = b.align || [];
     const cls = (i) => (al[i] === "r" ? ' class="r"' : "");
-    return `${b.caption ? `<div class="tbl-cap">${md(b.caption)}</div>` : ""}<div class="tbl-wrap"><table><thead><tr>${b.head.map((h, i) => `<th${cls(i)}>${md(h)}</th>`).join("")}</tr></thead><tbody>${b.rows.map((r, ri) => `<tr${b.totalLast && ri === b.rows.length - 1 ? ' class="tot"' : ""}>${r.map((c, i) => `<td${cls(i)}>${md(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `${b.caption ? `<div class="tbl-cap">${md(b.caption)}</div>` : ""}<div class="tbl-wrap"><table><thead><tr>${b.head.map((h, i) => `<th${cls(i)}>${md(h)}</th>`).join("")}</tr></thead><tbody>${b.rows.map((r, ri) => `<tr${b.totalLast && ri === b.rows.length - 1 ? ' class="tot"' : ""}>${r.map((c, i) => `<td${cls(i)}>${rich(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
   const NOTE = { tip: "Подсказка", trap: "Ловушка", exam: "На контрольной", law: "Норма" };
   function renderBlock(b) {
     switch (b.t) {
-      case "p": return `<p>${md(b.text)}</p>`;
-      case "def": return `<div class="b-def"><b>${md(b.term)}</b>${md(b.text)}${b.src ? `<small>${md(b.src)}</small>` : ""}</div>`;
-      case "list": { const tag = b.ordered ? "ol" : "ul"; return `<${tag} class="b-list">${b.items.map((i) => `<li>${md(i)}</li>`).join("")}</${tag}>`; }
+      case "p": return isRich(b.text) ? `<div class="rt-block">${rich(b.text)}</div>` : `<p>${md(b.text)}</p>`;
+      case "def": return `<div class="b-def"><b>${md(b.term)}</b>${rich(b.text)}${b.src ? `<small>${md(b.src)}</small>` : ""}</div>`;
+      case "list": {
+        if (b.groups) return `<div class="lgroups${b.groups.length < 2 ? " one" : ""}">${b.groups.map((g) => `<div class="lgroup">${cardTitle(g.h)}<ul class="rt-ul">${g.items.map((i) => `<li>${md(i)}</li>`).join("")}</ul></div>`).join("")}</div>`;
+        const tag = b.ordered ? "ol" : "ul"; return `<${tag} class="b-list">${b.items.map((i) => `<li>${rich(i)}</li>`).join("")}</${tag}>`;
+      }
       case "table": return `<div>${renderTable(b)}</div>`;
-      case "formula": return `<div class="b-formula">${md(b.text)}${b.note ? `<small>${md(b.note)}</small>` : ""}</div>`;
-      case "example": return `<div class="b-ex"><h4>${md(b.title)}</h4>${b.given ? `<p class="given">${md(b.given)}</p>` : ""}<ol>${b.steps.map((s) => `<li><span>${md(s)}</span></li>`).join("")}</ol>${b.result ? `<span class="res">${md(b.result)}</span>` : ""}</div>`;
+      case "formula": return `<div class="b-formula">${md(b.text)}${b.note ? `<small>${rich(b.note)}</small>` : ""}</div>`;
+      case "example": return `<div class="b-ex"><h4>${md(b.title)}</h4>${b.given ? `<div class="given"><span class="ex-l">Условие</span>${rich(b.given)}</div>` : ""}${b.steps.length ? `<span class="ex-l">Решение</span>` : ""}<ol>${b.steps.map((s) => `<li><span>${rich(s)}</span></li>`).join("")}</ol>${b.result ? `<div class="ex-res">${rich(b.result)}</div>` : ""}</div>`;
       case "entries": return `<div>${b.caption ? `<div class="tbl-cap">${md(b.caption)}</div>` : ""}<div class="tbl-wrap"><table><thead><tr><th>Операция</th><th>Дебет</th><th>Кредит</th><th class="r">Сумма</th></tr></thead><tbody>${b.rows.map((r) => `<tr><td>${md(r.op)}</td><td>${md(r.dt)}</td><td>${md(r.kt)}</td><td class="r">${md(r.sum)}</td></tr>`).join("")}</tbody></table></div></div>`;
       case "eq": return `<div>${b.caption ? `<div class="tbl-cap">${md(b.caption)}</div>` : ""}<div class="tbl-wrap"><table><thead><tr><th>Операция</th><th>Активы</th><th>Капитал</th><th>Обязательства</th></tr></thead><tbody>${b.rows.map((r) => `<tr><td>${md(r.op)}</td><td class="eq-a">${md(r.a)}</td><td class="eq-k">${md(r.k)}</td><td class="eq-o">${md(r.o)}</td></tr>`).join("")}</tbody></table></div></div>`;
-      case "note": { const sp = b.kind === "exam" ? spoilerTasks(b.text) : []; if (sp.length) return `<details class="b-note exam spoiler"><summary><b>${sp.length > 1 ? `Подсказка к заданиям ${sp.join(" и ")}` : `Подсказка к заданию ${sp[0]}`} контрольной</b><span class="tiny">Внутри подсказка к ответу. Сначала попробуй решить ${sp.map((n) => `<a href="#/exam/${n}">задание ${n}</a>`).join(" и ")} самостоятельно.</span></summary><span>${md(b.text)}</span></details>`; return `<div class="b-note ${b.kind}"><b>${NOTE[b.kind] || ""}</b><span>${md(b.text)}</span></div>`; }
+      case "note": { const sp = b.kind === "exam" ? spoilerTasks(b.text) : []; if (sp.length) return `<details class="b-note exam spoiler"><summary><b>${sp.length > 1 ? `Подсказка к заданиям ${sp.join(" и ")}` : `Подсказка к заданию ${sp[0]}`} контрольной</b><span class="tiny">Внутри подсказка к ответу. Сначала попробуй решить ${sp.map((n) => `<a href="#/exam/${n}">задание ${n}</a>`).join(" и ")} самостоятельно.</span></summary><span>${rich(b.text)}</span></details>`; return `<div class="b-note ${b.kind}"><b>${NOTE[b.kind] || ""}</b><span>${rich(b.text)}</span></div>`; }
       case "case": return renderCase(b.part);
       case "scheme": { const x = SCHEMES.find((y) => y.id === b.id); return x ? schemeFigure(x) : ""; }
       default: return "";
@@ -355,8 +387,8 @@
   window.addEventListener("resize", qtipHide);
 
   /* ---------- Каркас ---------- */
-  const NAV = [["", "Главная", "Главная"], ["theory", "Теория", "Теория"], ["exam", "Контрольная", "Контрольная"], ["bank", "Банк заданий", "Банк"], ["schemes", "Схемы", "Схемы"]];
-  const navKey = (r) => ({ m: "theory", l: "theory", p: "theory", theory: "theory", exam: "exam", mock: "exam", reports: "exam", variants: "exam", v: "exam", notes: "exam", bank: "bank", train: "bank", cards: "bank", mistakes: "bank", plan: "", cheat: "schemes", schemes: "schemes" }[r] ?? "");
+  const NAV = [["", "Главная", "Главная"], ["plan", "План", "План"], ["theory", "Теория", "Теория"], ["exam", "Контрольная", "Контрольная"], ["bank", "Банк заданий", "Банк"], ["schemes", "Схемы", "Схемы"]];
+  const navKey = (r) => ({ m: "theory", l: "theory", p: "theory", theory: "theory", exam: "exam", mock: "exam", reports: "exam", variants: "exam", v: "exam", notes: "exam", bank: "bank", train: "bank", cards: "bank", mistakes: "bank", plan: "plan", cheat: "schemes", schemes: "schemes" }[r] ?? "");
   function shell(route, html) {
     const key = navKey(route);
     app.innerHTML = `<div class="shell"><header class="top"><a class="hub-btn" href="${HUB_URL}" aria-label="Все предметы" title="Все предметы">${ICON.hub}<span>Все предметы</span></a><a class="brand" href="#/"><i></i>Финучёт</a><nav class="seg" aria-label="Разделы">${NAV.map(([k, t]) => `<a href="#/${k}" class="${k === key ? "on" : ""}">${t}</a>`).join("")}</nav><button class="round" data-act="search" aria-label="Поиск">${ICON.search}</button><a class="round acc-btn ${route === "account" ? "on" : ""}" href="#/account" aria-label="Аккаунт">${ICON.user}<i id="acc-dot" class="acc-dot ${accCode && cloudOn() ? sync.state : "off"}"></i></a><button class="round" data-act="settings" aria-label="Настройки">${ICON.gear}</button></header><main id="view">${html}</main></div><nav class="bottombar" aria-label="Разделы">${NAV.map(([k, , t]) => `<a href="#/${k}" class="${k === key ? "on" : ""}">${t}</a>`).join("")}</nav>`;
@@ -408,7 +440,7 @@
     else if (it.t === "mistakes") { link = "mistakes"; const v = d.items.find((x) => x.t === "variant"); if (v && varDone(v.v) && !mistakes().length) auto = "done"; }
     else link = it.t === "cards" && it.mod ? `cards/${it.mod}` : { notes: "notes", cheat: "cheat", cards: "cards", schemes: "schemes" }[it.t] || "";
     const man = !!S.manual[key], state = man || auto === "done" ? "done" : auto === "part" ? "part" : "new";
-    return { key, title, min, link, state, man, auto, hint, kind: DP_KIND[it.t] || "", date: d.date, l: it.t === "lesson" ? LMAP[it.id] : null, schemes: it.t === "schemes" ? (it.ids || []).map((id) => SCHEMES.find((x) => x.id === id)).filter(Boolean) : null };
+    return { key, title, min, link, state, man, auto, hint, kind: DP_KIND[it.t] || "", date: d.date, ns: it.ns || null, l: it.t === "lesson" ? LMAP[it.id] : null, schemes: it.t === "schemes" ? (it.ids || []).map((id) => SCHEMES.find((x) => x.id === id)).filter(Boolean) : null };
   }
   const dpItems = (d) => d.items.map((it, i) => dpItem(d, it, i));
   const dpLeftMin = (list) => list.filter((x) => x.state !== "done").reduce((a, x) => a + x.min, 0);
@@ -418,6 +450,57 @@
   function dpNext() { if (!dpActive()) return null; const d = dpToday(), list = [...dpBehind(d.date), ...dpItems(d)]; return list.find((x) => x.state !== "done") || null; }
   const planTabs = (cur) => (DP ? `<div class="chips no-print" style="margin-bottom:16px"><a class="chip ${cur === "days" ? "on" : ""}" href="#/plan">По дням до ${esc(dpDate(DP.exam, { day: "numeric", month: "long" }))}</a><a class="chip ${cur === "auto" ? "on" : ""}" href="#/plan/auto">Свой маршрут по дате</a></div>` : "");
   const dpRow = (x, behind) => `<div class="dp-item ${x.state}"><button class="dp-check" data-act="dp-tick" data-key="${esc(x.key)}" aria-pressed="${x.state === "done"}" ${x.auto === "done" && !x.man ? `disabled title="Отмечено само: задания решены"` : ""} aria-label="${x.state === "done" ? "Снять отметку" : "Отметить сделанным"}: ${esc(x.title)}">${ICON.check}</button><a class="dp-main" href="#/${x.link}"><span class="dp-title">${esc(x.title)}</span><span class="dp-meta"><span class="tag">${esc(x.kind)}</span>${behind ? `<span class="tag bad">с ${esc(dpDate(x.date, { day: "numeric", month: "long" }))}</span>` : ""}${x.hint ? `<span class="tiny muted">${esc(x.hint)}</span>` : ""}</span></a><small class="tiny faint">${x.min} мин</small>${x.schemes && x.schemes.length ? `<div class="dp-thumbs">${x.schemes.map((s) => `<button class="dp-thumb" data-act="zoom" data-id="${s.id}" aria-label="Открыть схему «${esc(s.title)}»"><img loading="lazy" decoding="async" src="${SIMG[s.id]}" alt=""><span>${esc(s.title)}</span></button>`).join("")}</div>` : ""}</div>`;
+  /* ---------- Полоса плана дня сверху страницы ----------
+     Показывается на уроке, задании или схеме из плана: день, открытый в плане последним, или сегодняшний день.
+     Видно все пункты дня (сделанные, текущий, оставшиеся) и кнопку «Дальше» к следующему несделанному. */
+  let dpCtx = (() => { try { return sessionStorage.getItem("fu-dpctx") || ""; } catch (e) { return ""; } })();
+  const setDpCtx = (d) => { dpCtx = d; try { sessionStorage.setItem("fu-dpctx", d); } catch (e) {} };
+  let dpbOpen = (() => { try { return localStorage.getItem("fu-dpb-open") === "1"; } catch (e) { return false; } })();
+  function dpMatch(x, link) {
+    if (!x.link || !link) return false;
+    if (x.link === link) return true;
+    const [r, a] = link.split("/");
+    if (r === "exam" && x.ns) return x.ns.includes(+a);
+    if (r === "schemes" && x.link === "schemes") return true;
+    if (r === "cards" && x.link === "cards") return true;
+    return false;
+  }
+  function dpFor(link) {
+    if (!dpActive() || !link) return null;
+    const at = (d) => { if (!d) return null; const list = dpItems(d), i = list.findIndex((x) => dpMatch(x, link)); return i >= 0 ? { d, list, i } : null; };
+    const today = dpToday();
+    const hit = at(DP.days.find((d) => d.date === dpCtx)) || at(today);
+    if (hit) return hit;
+    for (const d of DP.days) { if (d.date >= today.date) break; const h = at(d); if (h && h.list[h.i].state !== "done") return h; }
+    return null;
+  }
+  const dpAfter = (c) => c.list.slice(c.i + 1).find((x) => x.state !== "done") || c.list.find((x, j) => j !== c.i && x.state !== "done") || null;
+  function curLink() {
+    const p = location.hash.replace(/^#\//, "").split("/"), r = p[0] || "";
+    return r === "exam" ? `exam/${clampN(p[1])}` : p.slice(0, 2).filter((x) => x != null && x !== "").join("/");
+  }
+  function dpBar(link) {
+    const c = dpFor(link); if (!c) return "";
+    const { d, list, i } = c, done = list.filter((x) => x.state === "done").length, left = dpLeftMin(list), nx = dpAfter(c), t = localDay();
+    const when = d.date === t ? "Сегодня" : dpDate(d.date, { day: "numeric", month: "long" });
+    const steps = list.map((x, j) => `<a class="dpb-step ${x.state}${j === i ? " cur" : ""}" href="#/${x.link}" role="listitem"${j === i ? ' aria-current="step"' : ""} title="${esc(x.kind)}: ${esc(x.title)}"><i>${x.state === "done" ? ICON.check : j + 1}</i><span>${esc(x.title)}</span></a>`).join("");
+    const rows = list.map((x, j) => (j === i ? dpRow(x).replace('class="dp-item ', 'class="dp-item cur ').replace('<span class="dp-meta">', '<span class="dp-meta"><span class="tag lime">Сейчас</span>') : dpRow(x))).join("");
+    return `<section class="dpbar no-print" id="dpbar" aria-label="План на ${esc(dpDate(d.date, { day: "numeric", month: "long" }))}">
+      <div class="dpb-head"><a class="dpb-day" href="#/plan/${d.date}" title="Открыть план дня"><span class="dpb-when">${esc(when)}</span><b>${esc(d.short || d.title)}</b></a>
+      <span class="dpb-count">Пункт ${i + 1} из ${list.length} · сделано ${done}${left ? `, осталось ≈ ${hrs(left)}` : ""}</span>
+      <button class="dpb-tg" data-act="dpb-toggle" aria-expanded="${dpbOpen}">${dpbOpen ? "Свернуть" : "Весь список"}</button>
+      ${nx ? `<a class="pill ink dpb-next" href="#/${nx.link}"><span class="dpb-next-l">Дальше:</span><span class="dpb-next-t">${esc(nx.title)}</span>${ICON.next}</a>` : `<a class="pill ink dpb-next" href="#/plan">${d.date === t ? "День пройден" : "Пункты дня пройдены"}: к плану ${ICON.next}</a>`}</div>
+      ${dpbOpen ? `<div class="dp-list dpb-list">${rows}</div>` : `<div class="dpb-steps" role="list">${steps}</div>`}
+    </section>`;
+  }
+  /* Текущий пункт — в середину полосы, без прокрутки страницы */
+  function dpBarCenter() { const s = $("#dpbar .dpb-step.cur"); if (s) { const p = s.parentElement; p.scrollLeft = s.offsetLeft - p.clientWidth / 2 + s.offsetWidth / 2; } }
+  function dpBarRefresh() {
+    const old = $("#dpbar"), html = dpBar(curLink()), view = $("#view"); if (!view) return;
+    const x = old && $(".dpb-steps", old) ? $(".dpb-steps", old).scrollLeft : null;
+    if (old) { if (html) old.outerHTML = html; else old.remove(); } else if (html) view.insertAdjacentHTML("afterbegin", html);
+    const st = $("#dpbar .dpb-steps"); if (st && x != null) st.scrollLeft = x; else dpBarCenter();
+  }
   function viewDays(sel) {
     const t = localDay(), cur = DP.days.find((d) => d.date === sel) || dpToday(), left = daysLeft();
     const tiles = DP.days.map((d) => {
@@ -530,7 +613,7 @@
     const examLinks = (l.examTasks || []).map((n) => `<a class="tag lime" href="#/exam/${n}">Задание ${n}</a>`).join(" ");
     return `${crumbs([["", "Главная"], ["theory", "Теория"], [`m/${m.id}`, SHORT[m.id] || m.title], ["", l.title]])}
     <div class="reader" data-lesson="${l.id}"><article><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${rpMini(l.id)}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что упущено.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
-      <div class="glass" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-radius:28px"><button class="pill ghost" data-act="manual" data-id="${l.id}">${S.manual[l.id] ? "Снять отметку «изучено»" : "Отметить как изученный"}</button><div style="display:flex;gap:8px;flex-wrap:wrap">${prev ? `<a class="pill" href="#/l/${prev.id}">Назад</a>` : ""}${nxt ? `<a class="pill ink" href="#/l/${nxt.id}">Следующий урок</a>` : `<a class="pill ink" href="#/exam">К контрольной</a>`}</div></div></article>
+      <div class="glass" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-radius:28px"><button class="pill ghost" data-act="manual" data-id="${l.id}">${S.manual[l.id] ? "Снять отметку «изучено»" : "Отметить как изученный"}</button><div style="display:flex;gap:8px;flex-wrap:wrap">${prev ? `<a class="pill" href="#/l/${prev.id}">Назад</a>` : ""}${(() => { const c = dpFor(`l/${l.id}`), pn = c && dpAfter(c); return pn ? `${nxt ? `<a class="pill" href="#/l/${nxt.id}">Следующий урок</a>` : ""}<a class="pill ink" href="#/${pn.link}" title="${esc(pn.title)}">Дальше по плану</a>` : nxt ? `<a class="pill ink" href="#/l/${nxt.id}">Следующий урок</a>` : `<a class="pill ink" href="#/exam">К контрольной</a>`; })()}</div></div></article>
     <aside class="toc"><h4>В этом уроке</h4>${l.sections.map((s, si) => `<a href="#/l/${l.id}" data-scroll="sec-${si}" data-toc="${si}" class="${secState(l, si)}"><i></i><span>${esc(s.title)}</span></a>`).join("")}${openFor(l.id).length ? `<a href="#/l/${l.id}" data-scroll="sec-open" class="${openFor(l.id).every((o) => isOk(`open.${o.id}`)) ? "done" : ""}"><i></i><span>Ответь своими словами</span></a>` : ""}${RP_LESSONS[l.id] ? `<a href="#/l/${l.id}" data-scroll="sec-rp" class="${(() => { const c = rpMiniCount(l.id); return c.ok === c.total ? "done" : ""; })()}"><i></i><span>Строки в отчётах</span></a>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<a href="#/l/${l.id}" data-scroll="sec-exam" class="${LESSON_EXAM[l.id].every((n) => isOk(`exam.${n}`)) ? "done" : ""}"><i></i><span>Задание с контрольной</span></a>` : ""}<div class="toc-progress" id="toc-progress">${tocProgress(l)}</div></aside></div>`;
   }
   function examInline(n) {
@@ -544,6 +627,7 @@
   }
   const tocProgress = (l) => { const ids = lessonQids(l), ok = ids.filter(isOk).length; return `Верно ${ok} из ${ids.length} мини-заданий`; };
   function paintProgress(qid) {
+    dpBarRefresh();
     const reg = QREG[qid]; if (!reg || !reg.lesson) return; const l = reg.lesson, root = $(`[data-lesson="${l.id}"]`); if (!root) return;
     l.sections.forEach((s, si) => { const a = $(`[data-toc="${si}"]`, root); if (a) a.className = secState(l, si); });
     const tp = $("#toc-progress", root); if (tp) tp.textContent = tocProgress(l);
@@ -1077,10 +1161,10 @@
 
   /* ---------- Поиск и настройки ---------- */
   let searchIndex = null;
-  const blockText = (b) => { switch (b.t) { case "def": return `${b.term} ${b.text}`; case "list": return b.items.join(" "); case "table": return [...b.head, ...b.rows.flat()].join(" "); case "example": return [b.title, b.given, ...b.steps, b.result].join(" "); case "formula": return `${b.text} ${b.note || ""}`; case "entries": return b.rows.map((r) => r.op).join(" "); case "eq": return b.rows.map((r) => r.op).join(" "); default: return b.text || ""; } };
+  const blockText = (b) => { switch (b.t) { case "def": return `${b.term} ${b.text}`; case "list": return b.items ? b.items.join(" ") : b.groups.flatMap((g) => [g.h, ...g.items]).join(" "); case "table": return [...b.head, ...b.rows.flat()].join(" "); case "example": return [b.title, b.given, ...b.steps, b.result].join(" "); case "formula": return `${b.text} ${b.note || ""}`; case "entries": return b.rows.map((r) => r.op).join(" "); case "eq": return b.rows.map((r) => r.op).join(" "); default: return b.text || ""; } };
   function buildIndex() {
     searchIndex = [];
-    LESSONS.forEach((l) => (l.sections || []).forEach((s, si) => searchIndex.push({ title: l.title, sub: s.title, text: (s.blocks || []).map(blockText).join(" ").replace(/\*\*/g, ""), link: `l/${l.id}`, scroll: `sec-${si}` })));
+    LESSONS.forEach((l) => (l.sections || []).forEach((s, si) => searchIndex.push({ title: l.title, sub: s.title, text: (s.blocks || []).map(blockText).join(" ").replace(/\*\*/g, "").replace(/\n(- )?/g, " "), link: `l/${l.id}`, scroll: `sec-${si}` })));
     TASKS.forEach((t) => searchIndex.push({ title: `Контрольная, задание ${t.n}`, sub: t.topic, text: t.cond.map(blockText).join(" "), link: `exam/${t.n}` }));
     MODS.forEach((m) => (m.practice || []).forEach((p) => searchIndex.push({ title: p.title, sub: "Практикум", text: (p.condition || []).map(blockText).join(" "), link: `p/${p.id}` })));
     OPENQ.forEach((o) => searchIndex.push({ title: o.q, sub: "Вопрос на теорию", text: o.model, link: "bank/open" }));
@@ -1219,7 +1303,7 @@
     const parts = location.hash.replace(/^#\//, "").split("/"), r = parts[0] || "", a = parts[1];
     closeOv(); clearInterval(mockTimer);
     if (r === "exam" && $("#wheel") && prevRoute === "exam") {
-      const n = clampN(a); updateExam(n); prevRoute = r; return;
+      const n = clampN(a); updateExam(n); dpBarRefresh(); prevRoute = r; return;
     }
     let html = "";
     if (r === "") html = viewHome();
@@ -1242,7 +1326,9 @@
     else if (r === "v") html = parts[2] === "study" ? viewVariantStudy(+a) : parts[2] === "print" ? viewVariantPrint(+a) : viewVariant(+a);
     else if (r === "schemes") { const gs = [...new Set(SCHEMES.map((x) => x.group))]; html = viewSchemes(a != null && a !== "" ? gs[+a] : null); }
     else html = notFound();
-    shell(r, html);
+    if (r === "plan" && a !== "auto" && dpActive()) setDpCtx((DP.days.find((d) => d.date === a) || dpToday()).date);
+    shell(r, (r === "plan" || r === "" ? "" : dpBar(curLink())) + html);
+    dpBarCenter();
     vizInitAll();
     window.scrollTo(0, pendingScroll ? window.scrollY : 0);
     if (r === "exam") { layoutWheel(clampN(a)); }
@@ -1363,6 +1449,7 @@
     else if (act === "acc-logout") { if (ac.dataset.sure) { push(true); accCode = null; try { localStorage.removeItem(CODE_KEY); } catch (err) {} route(); toast("Вы вышли на этом устройстве"); } else { ac.dataset.sure = "1"; ac.textContent = "Точно выйти"; } }
     else if (act === "inline-sol") { const box = ac.closest(".exam-inline"); $$(".exam-inline-sol", box).forEach((x) => (x.hidden = false)); ac.remove(); }
     else if (act === "print-var") { document.body.classList.toggle("print-key", ac.dataset.key === "1"); window.print(); }
+    else if (act === "dpb-toggle") { dpbOpen = !dpbOpen; try { localStorage.setItem("fu-dpb-open", dpbOpen ? "1" : "0"); } catch (e) {} dpBarRefresh(); const tg = $("#dpbar .dpb-tg"); if (tg) tg.focus(); }
     else if (act === "dp-tick") { const k = ac.dataset.key; S.manual[k] = !S.manual[k]; if (!S.manual[k]) delete S.manual[k]; bump(); save(); softRerender(); }
     else if (act === "plan-mode") { S.planMode = ac.dataset.mode; save(); route(); }
     else if (act === "form-base") { S.forms.seed = 0; save(); route(); }
