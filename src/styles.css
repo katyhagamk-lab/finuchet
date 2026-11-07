@@ -848,3 +848,32 @@ input[type=range]{accent-color:var(--ink);width:190px;max-width:100%}
   .rp-cond-btn{width:46px;height:46px;padding:0;justify-content:center;border-radius:50%}
   .rp-cond-btn span{display:none}
 }
+
+/* Строки отчётов внутри уроков */
+.rp-mini{background:#fff;border-radius:var(--r-lg);padding:16px 16px 18px}
+.rp-mini-cond{background:var(--card);border-radius:18px;padding:12px 12px 8px;margin-bottom:6px}
+details.rp-mini-cond{padding:0 12px}
+details.rp-mini-cond>summary{cursor:pointer;list-style:none;padding:13px 2px;font-weight:500;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+details.rp-mini-cond>summary::-webkit-details-marker{display:none}
+details.rp-mini-cond>summary::after{content:"+";margin-left:auto;color:var(--ink-3);font-weight:300;font-size:20px;line-height:1}
+details.rp-mini-cond[open]>summary::after{content:"−"}
+details.rp-mini-cond[open]{padding-bottom:10px}
+.rp-mini-label{font-size:13px;color:var(--ink-3);margin:0 2px 6px}
+.rp-mini .rp-osv{background:#fff;border-radius:12px;padding:2px 4px;margin-bottom:8px}
+.rp-ops.plain li{grid-template-columns:20px minmax(0,1fr);padding:6px}
+.rp-mini-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:16px 4px 8px}
+.rp-mini-h b{font-weight:550;font-size:16px}
+.rp-mini .statement{background:var(--card)}
+.rp-mini .rp-table .cellbox input{background:#fff}
+.rp-mini .rp-table .cellbox.right input{background:var(--ok-soft)}
+.rp-mini .rp-table .cellbox.wrong input{background:var(--bad-soft)}
+.rp-mini .rp-row.cur td,.rp-mini .rp-hint-row td{background:#EFEFEC}
+.rp-mini .rp-see{display:inline-flex}
+.rp-mini .rp-hint-in .pill.ghost{background:var(--card)}
+.rp-mstat{margin-left:auto}
+.rp-where a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+@media (max-width:640px){
+  .rp-mini{padding:12px 10px 14px;margin:0 -6px}
+  .rp-mini .rp-table .cellbox{width:112px}
+  .rp-mstat{margin-left:0;flex-basis:100%}
+}

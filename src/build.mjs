@@ -11,11 +11,13 @@ if (fs.existsSync(contentDir)) {
     if (!f.some((x) => /^l\d+\.json$/.test(x))) continue;
     const m = f.includes("_module.json") ? JSON.parse(fs.readFileSync(path.join(d, "_module.json"), "utf8")) : { id, title: id, subtitle: "" }; delete m.issues;
     m.lessons = f.filter((x) => /^l\d+\.json$/.test(x)).sort().map((x) => JSON.parse(fs.readFileSync(path.join(d, x), "utf8")));
-    m.practice = f.includes("practice.json") ? JSON.parse(fs.readFileSync(path.join(d, "practice.json"), "utf8")) : [];
-    m.open = f.includes("open.json") ? JSON.parse(fs.readFileSync(path.join(d, "open.json"), "utf8")).map(({ bad, ...o }) => o) : [];
-    m.practice.forEach((p) => { if (p.open) delete p.open.bad; });
+    // На контрольной только выбор ответа и числа: развёрнутые вопросы (open.json, «Вопросы для самоконтроля»,
+    // поле «Твой ответ» в практикумах, письменный режим карточек) в сайт не попадают.
+    m.practice = (f.includes("practice.json") ? JSON.parse(fs.readFileSync(path.join(d, "practice.json"), "utf8")) : []).filter((p) => !(p.tags || []).includes("вопросы для самоконтроля"));
+    m.open = [];
+    m.practice.forEach((p) => { delete p.open; });
     const c = f.includes("cards.json") ? JSON.parse(fs.readFileSync(path.join(d, "cards.json"), "utf8")) : {};
-    m.flashcards = (c.flashcards || []).map(({ bad, ...x }) => x); m.cheatsheet = c.cheatsheet || [];
+    m.flashcards = (c.flashcards || []).map(({ bad, kw, need, ...x }) => x); m.cheatsheet = c.cheatsheet || [];
     modules.push(m);
   }
 }

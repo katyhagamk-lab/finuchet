@@ -482,9 +482,9 @@
     const secs = l.sections.map((s, si) => `<section class="section" id="sec-${si}"><h2>${esc(s.title)}</h2><div class="blocks">${renderBlocks(s.blocks)}</div>${si === 0 && vizFor("lesson", l.id).length ? `<div style="margin-top:18px;display:flex;flex-direction:column;gap:14px">${vizFor("lesson", l.id).map(vizBlock).join("")}</div>` : ""}<div class="check"><div class="check-head"><span class="ring"></span><h3>Проверь себя</h3><span class="small muted" data-secstat="${si}"></span></div>${(s.quiz || []).map((q, qi) => quizHTML(`${l.id}.s${si}.q${qi}`, q)).join("")}</div></section>`).join("");
     const examLinks = (l.examTasks || []).map((n) => `<a class="tag lime" href="#/exam/${n}">Задание ${n}</a>`).join(" ");
     return `${crumbs([["", "Главная"], ["theory", "Теория"], [`m/${m.id}`, SHORT[m.id] || m.title], ["", l.title]])}
-    <div class="reader" data-lesson="${l.id}"><article><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что упущено.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
+    <div class="reader" data-lesson="${l.id}"><article><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${rpMini(l.id)}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что упущено.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
       <div class="glass" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-radius:28px"><button class="pill ghost" data-act="manual" data-id="${l.id}">${S.manual[l.id] ? "Снять отметку «изучено»" : "Отметить как изученный"}</button><div style="display:flex;gap:8px;flex-wrap:wrap">${prev ? `<a class="pill" href="#/l/${prev.id}">Назад</a>` : ""}${nxt ? `<a class="pill ink" href="#/l/${nxt.id}">Следующий урок</a>` : `<a class="pill ink" href="#/exam">К контрольной</a>`}</div></div></article>
-    <aside class="toc"><h4>В этом уроке</h4>${l.sections.map((s, si) => `<a href="#/l/${l.id}" data-scroll="sec-${si}" data-toc="${si}" class="${secState(l, si)}"><i></i><span>${esc(s.title)}</span></a>`).join("")}${openFor(l.id).length ? `<a href="#/l/${l.id}" data-scroll="sec-open" class="${openFor(l.id).every((o) => isOk(`open.${o.id}`)) ? "done" : ""}"><i></i><span>Ответь своими словами</span></a>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<a href="#/l/${l.id}" data-scroll="sec-exam" class="${LESSON_EXAM[l.id].every((n) => isOk(`exam.${n}`)) ? "done" : ""}"><i></i><span>Задание с контрольной</span></a>` : ""}<div class="toc-progress" id="toc-progress">${tocProgress(l)}</div></aside></div>`;
+    <aside class="toc"><h4>В этом уроке</h4>${l.sections.map((s, si) => `<a href="#/l/${l.id}" data-scroll="sec-${si}" data-toc="${si}" class="${secState(l, si)}"><i></i><span>${esc(s.title)}</span></a>`).join("")}${openFor(l.id).length ? `<a href="#/l/${l.id}" data-scroll="sec-open" class="${openFor(l.id).every((o) => isOk(`open.${o.id}`)) ? "done" : ""}"><i></i><span>Ответь своими словами</span></a>` : ""}${RP_LESSONS[l.id] ? `<a href="#/l/${l.id}" data-scroll="sec-rp" class="${(() => { const c = rpMiniCount(l.id); return c.ok === c.total ? "done" : ""; })()}"><i></i><span>Строки в отчётах</span></a>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<a href="#/l/${l.id}" data-scroll="sec-exam" class="${LESSON_EXAM[l.id].every((n) => isOk(`exam.${n}`)) ? "done" : ""}"><i></i><span>Задание с контрольной</span></a>` : ""}<div class="toc-progress" id="toc-progress">${tocProgress(l)}</div></aside></div>`;
   }
   function examInline(n) {
     const t = TASKS[n - 1], st = S.quiz[`exam.${n}`];
@@ -502,7 +502,7 @@
     const tp = $("#toc-progress", root); if (tp) tp.textContent = tocProgress(l);
   }
   function viewPractice(id) {
-    const p = PMAP[id]; if (!p) return notFound(); const m = p.mod, list = m.practice, i = list.indexOf(p), nx = list[i + 1];
+    const p = PMAP[id]; if (!p) { const mid = String(id || "").split("-")[0]; return MODS.some((x) => x.id === mid) ? viewModule(mid) : notFound(); } const m = p.mod, list = m.practice, i = list.indexOf(p), nx = list[i + 1];
     return `${crumbs([["", "Главная"], ["theory", "Теория"], [`m/${m.id}`, SHORT[m.id] || m.title], ["", "Практикум"]])}
     <div style="max-width:820px"><h1 class="h-lg" style="margin-bottom:8px">${esc(p.title)}</h1><div class="chips" style="margin-bottom:22px"><span class="tag wrap">${esc(p.src || "")}</span>${(p.examTasks || []).map((n) => `<a class="tag lime" href="#/exam/${n}">Задание ${n}</a>`).join("")}</div>
     <div class="paper"><h2 class="h-sm" style="margin-bottom:12px">Условие</h2><div class="blocks">${renderBlocks(p.condition)}</div></div>
@@ -644,19 +644,26 @@
   function rpMarkDone(fk) { S.formsDone[RP.key + fk] = true; if (RP.key === "base" && RP_FORMS.every(([k]) => S.formsDone["base" + k])) S.formsDone.base = true; save(); }
   const rpAllDone = () => RP_FORMS.every(([k]) => S.formsDone[RP.key + k]);
 
+  function rpEnsure(seed) {
+    const key = seed ? "s" + seed : "base";
+    if (!RP.F || RP.key !== key) {
+      const p = seed ? G.seedCase(seed) : G.CASE_BASE, s = G.solveCase(p);
+      RP.F = G.forms(s); RP.key = key; RP.opKeys = G.caseOpKeys(p); RP.p = p; RP.s = s; RP.by = {};
+      Object.entries(RP.F).forEach(([fk, f]) => { RP.by[fk] = {}; f.rows.forEach((r, ri) => { if (r.k) RP.by[fk][r.k] = { r, ri }; }); });
+    }
+    window.__forms = RP.F; window.__formsKey = RP.key;
+  }
   function viewReports() {
-    const seed = S.forms.seed || 0, isBase = !seed, p = isBase ? G.CASE_BASE : G.seedCase(seed), s = G.solveCase(p), learn = rpLearn();
-    RP.F = G.forms(s); RP.key = isBase ? "base" : "s" + seed; RP.opKeys = G.caseOpKeys(p); RP.focus = null; RP.calcOpen = {}; RP.by = {};
-    Object.entries(RP.F).forEach(([fk, f]) => { RP.by[fk] = {}; f.rows.forEach((r, ri) => { if (r.k) RP.by[fk][r.k] = { r, ri }; }); });
+    const seed = S.forms.seed || 0, isBase = !seed, learn = rpLearn();
+    rpEnsure(seed); RP.focus = null; RP.calcOpen = {};
     if (!RP_FORMS.some(([k]) => k === S.forms.tab)) S.forms.tab = "pl";
     RP.fk = S.forms.tab;
-    window.__forms = RP.F; window.__formsKey = RP.key;
-    const cond = isBase ? EX.tasks[17].cond.slice(0, -1) : G.caseCond(p, s);
+    const cond = isBase ? EX.tasks[17].cond.slice(0, -1) : G.caseCond(RP.p, RP.s);
     return `${crumbs([["", "Главная"], ["exam", "Контрольная"], ["", "Отчёты"]])}
     <div class="rp-head"><div><h1 class="h-lg">Собери отчёты сам</h1><p class="muted small" style="margin-top:6px">Бланки как на контрольной. Порядок: ОФР, ОДДС, потом баланс.</p></div>
       <div class="rp-tools"><div class="seg rp-seg" role="group" aria-label="Задача"><button class="${isBase ? "on" : ""}" data-act="form-base">Задача с контрольной</button><button class="${isBase ? "" : "on"}" data-act="form-new">${isBase ? "Новые числа" : "Другие числа"}</button></div>
       <div class="seg rp-seg" role="group" aria-label="Режим"><button class="${learn ? "on" : ""}" data-act="rp-mode" data-mode="learn" aria-pressed="${learn}">С подсказками</button><button class="${learn ? "" : "on"}" data-act="rp-mode" data-mode="exam" aria-pressed="${!learn}">Как на контрольной</button></div></div></div>
-    <div class="rp ${learn ? "learn" : "exam"}" id="rp">
+    <div class="rp rp-host ${learn ? "learn" : "exam"}" id="rp">
       <aside class="rp-side" id="rp-side" aria-label="Условие задачи">${learn ? `<div class="rp-hint-side" id="rp-hint-side" aria-live="polite">${rpHintIdle()}</div>` : ""}<div class="rp-cond" id="rp-cond">${rpCond(cond)}</div></aside>
       <section class="rp-work"><div class="rp-bar"><nav class="rp-tabs" role="tablist" aria-label="Отчёты" id="rp-tabs">${rpTabs()}</nav><button class="pill rp-cond-btn" data-act="rp-cond-open" aria-controls="rp-side" aria-label="Условие задачи"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z"/><path d="M14 3.5V8h4M10 12h5M10 15.5h5"/></svg><span>Условие</span></button></div><div id="rp-form" role="tabpanel">${rpForm()}</div></section>
     </div><div class="rp-scrim" id="rp-scrim" data-act="rp-cond-close" hidden></div>`;
@@ -681,7 +688,7 @@
     const fk = RP.fk, f = RP.F[fk], d = rpData(), learn = rpLearn(), two = f.cols.length > 1, idx = RP_FORMS.findIndex(([k]) => k === fk), next = RP_FORMS[idx + 1];
     const tip = fk === "pl" ? "Расходы можно писать без минуса, убыток со знаком минус." : fk === "cf" ? "Платежи можно без минуса, отрицательное сальдо со знаком минус." : "Начни с колонки «на начало года»: всё берётся из сальдовой ведомости.";
     const rows = f.rows.map((r, ri) => r.sec ? `<tr class="sec"><td class="rp-code"></td><td colspan="${f.cols.length + 1}">${esc(r.sec)}</td></tr>`
-      : `<tr class="rp-row${r.sum ? " sum" : ""}" data-ri="${ri}"><td class="rp-code">${esc(r.code || "")}</td><td class="rp-label"><span>${esc(r.l)}</span>${learn ? `<button class="rp-q" data-act="rp-q" data-ri="${ri}" tabindex="-1" aria-label="Подсказка: ${esc(r.l)}">?</button>` : ""}</td>${r.v.map((_, ci) => rpCell(fk, f, r, ri, ci, d, learn)).join("")}</tr>`).join("");
+      : `<tr class="rp-row${r.sum ? " sum" : ""}" data-fk="${fk}" data-ri="${ri}"><td class="rp-code">${esc(r.code || "")}</td><td class="rp-label"><span>${esc(r.l)}</span>${learn ? `<button class="rp-q" data-act="rp-q" data-ri="${ri}" tabindex="-1" aria-label="Подсказка: ${esc(r.l)}">?</button>` : ""}</td>${r.v.map((_, ci) => rpCell(fk, f, r, ri, ci, d, learn)).join("")}</tr>`).join("");
     const colsw = two ? `<div class="seg rp-colsw" role="group" aria-label="Колонка баланса">${[1, 0].map((c) => `<button class="${RP.col === c ? "on" : ""}" data-act="rp-col" data-col="${c}" aria-pressed="${RP.col === c}">${esc(f.cols[c])}</button>`).join("")}</div>` : "";
     return `<div class="rp-fhead"><h2 class="h-md">${esc(f.title)}</h2><p class="tiny muted">тыс. руб. ${tip}</p></div>${colsw}
     <div class="statement rp-table${two ? " two" : ""}" data-col="${RP.col}"><table><thead><tr><th class="rp-code">Код</th><th>Показатель</th>${f.cols.map((c, ci) => `<th class="r c${ci}">${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>
@@ -709,37 +716,47 @@
     const opsN = (r.ops || []).map((k) => RP.opKeys.indexOf(k) + 1).filter((x) => x > 0);
     if (opsN.length) where.push(`${opsN.length > 1 ? "пункты" : "пункт"} ${opsN.join(", ")}`);
     if (r.f) where.push("строки этого отчёта выше");
+    const tl = rpTopic(fk, r.k, ci), here = RP.focus && RP.focus.host && RP.focus.host.dataset.lesson;
+    if (tl && LMAP[tl] && tl !== here) where.push(`урок <a href="#/l/${tl}">«${esc(LMAP[tl].title)}»</a>`);
     const sc = r.f ? rpSumCalc(fk, r, ci) : null, open = !!RP.calcOpen[id];
     const calc = open ? `<div class="rp-calc"><span class="tiny muted">Расчёт</span><div class="rp-calc-v">${md(sc ? sc.nums : r.calc[ci])}</div>${sc ? `<span class="tiny muted">${esc(sc.labels)}</span>` : ""}</div>` : "";
     return `<div class="rp-hint-top"><span class="tag">${esc(r.code || "")}</span><b>${esc(r.l)}</b>${f.cols.length > 1 ? `<span class="tiny faint">${esc(f.cols[ci].toLowerCase())}</span>` : ""}</div>
       <p class="rp-why">${md(r.why || "")}</p>${where.length ? `<p class="rp-where tiny muted">Где смотреть: ${where.join(" · ")}</p>` : ""}${st}${calc}
       <div class="rp-hint-acts">${open ? "" : `<button class="pill ghost sm" data-act="rp-calc" data-id="${id}">Показать расчёт</button>`}${opsN.length || (r.osv && r.osv.length) ? `<button class="pill ghost sm rp-see" data-act="rp-cond-open">Открыть условие</button>` : ""}</div>`;
   }
-  function rpPaintHint() {
-    if (!rpLearn() || !$("#rp")) return;
-    const old = $("#rp-form .rp-hint-row"), side = $("#rp-hint-side");
-    if (!RP.focus || RP.focus.fk !== RP.fk) { if (old) old.remove(); if (side) side.innerHTML = rpHintIdle(); return; }
-    const { fk, ri, ci } = RP.focus, html = rpHintHTML(fk, ri, ci);
-    if (rpNarrow()) {
-      const tr = $(`#rp-form tr[data-ri="${ri}"]`); if (!tr) return;
-      let row = old; if (!row || row.previousElementSibling !== tr) { if (old) old.remove(); row = document.createElement("tr"); row.className = "rp-hint-row"; row.innerHTML = `<td colspan="${RP.F[fk].cols.length + 2}"><div class="rp-hint-in" aria-live="polite"></div></td>`; tr.after(row); }
-      row.querySelector(".rp-hint-in").innerHTML = html;
-    } else { if (old) old.remove(); if (side) side.innerHTML = html; }
+  function rpInlineHint(host, f) {
+    const tr = $(`tr[data-fk="${f.fk}"][data-ri="${f.ri}"]`, host); if (!tr) return;
+    let row = tr.nextElementSibling && tr.nextElementSibling.classList.contains("rp-hint-row") ? tr.nextElementSibling : null;
+    $$(".rp-hint-row", host).forEach((x) => { if (x !== row) x.remove(); });
+    if (!row) { row = document.createElement("tr"); row.className = "rp-hint-row"; row.innerHTML = `<td colspan="${tr.children.length}"><div class="rp-hint-in" aria-live="polite"></div></td>`; tr.after(row); }
+    row.querySelector(".rp-hint-in").innerHTML = rpHintHTML(f.fk, f.ri, f.ci);
   }
-  function rpHighlight(r) {
-    $$("#rp-cond .hl").forEach((x) => x.classList.remove("hl"));
-    if (!r || !rpLearn()) return;
-    (r.ops || []).forEach((k) => { const el = $(`#rp-cond li[data-op="${k}"]`); if (el) el.classList.add("hl"); });
-    (r.osv || []).forEach((a) => { const el = $(`#rp-cond tr[data-acc="${a}"]`); if (el) el.classList.add("hl"); });
-    const box = $("#rp-cond"), first = $("#rp-cond .hl");
+  function rpPaintHint() {
+    const f = RP.focus;
+    if (f && f.host && f.host.classList.contains("rp-mini")) { if (f.host.isConnected) rpInlineHint(f.host, f); return; }
+    if (!rpLearn() || !$("#rp")) return;
+    const side = $("#rp-hint-side");
+    if (!f || f.fk !== RP.fk) { $$("#rp-form .rp-hint-row").forEach((x) => x.remove()); if (side) side.innerHTML = rpHintIdle(); return; }
+    if (rpNarrow()) rpInlineHint($("#rp"), f);
+    else { $$("#rp-form .rp-hint-row").forEach((x) => x.remove()); if (side) side.innerHTML = rpHintHTML(f.fk, f.ri, f.ci); }
+  }
+  function rpHighlight(r, host) {
+    const mini = host && host.classList.contains("rp-mini"), box = mini ? $(".rp-mini-cond", host) : $("#rp-cond");
+    $$(".rp-host .hl").forEach((x) => x.classList.remove("hl"));
+    if (!r || !box || (!mini && !rpLearn())) return;
+    (r.ops || []).forEach((k) => { const el = $(`li[data-op="${k}"]`, box); if (el) el.classList.add("hl"); });
+    (r.osv || []).forEach((a) => { const el = $(`tr[data-acc="${a}"]`, box); if (el) el.classList.add("hl"); });
+    if (mini) return;
+    const first = $("#rp-cond .hl");
     if (!box || !first || (rpNarrow() && !$("#rp-side.open"))) return;
     const b = box.getBoundingClientRect(), e = first.getBoundingClientRect(), head = 52;
     if (e.top < b.top + head || e.bottom > b.bottom - 12) box.scrollTo({ top: box.scrollTop + e.top - b.top - head - 8, behavior: "smooth" });
   }
   function rpFocus(inp) {
     const [fk, ri, ci] = inp.dataset.cell.split("."), r = RP.F[fk].rows[+ri];
-    $$("#rp-form tr.cur").forEach((x) => x.classList.remove("cur")); inp.closest("tr").classList.add("cur");
-    RP.focus = { fk, ri: +ri, ci: +ci }; rpHighlight(r); rpPaintHint();
+    const host = inp.closest(".rp-host");
+    $$(".rp-host tr.cur").forEach((x) => x.classList.remove("cur")); inp.closest("tr").classList.add("cur");
+    RP.focus = { fk, ri: +ri, ci: +ci, host }; rpHighlight(r, host); rpPaintHint();
   }
   function rpMark(inp, force) {
     const [fk, ri, ci] = inp.dataset.cell.split("."), r = RP.F[fk].rows[+ri], raw = rpData()[inp.dataset.cell] || "", box = inp.parentElement, has = String(raw).trim() !== "";
@@ -753,7 +770,7 @@
     if (same) { inp.value = rpShow(raw); return; }
     rpData()[id] = raw; save();
     inp.value = rpShow(raw); if (rpIsExpr(raw)) inp.title = raw; else inp.removeAttribute("title");
-    rpMark(inp); rpAfterChange();
+    const mini = inp.closest(".rp-mini"); rpMark(inp, !!mini); if (mini) rpMiniAfter(mini); else rpAfterChange();
   }
   function rpAfterChange() {
     const tabs = $("#rp-tabs"); if (tabs) tabs.innerHTML = rpTabs();
@@ -780,7 +797,7 @@
   }
   function rpSetTab(fk) {
     S.forms.tab = fk; RP.fk = fk; RP.focus = null; save();
-    $("#rp-form").innerHTML = rpForm(); $("#rp-tabs").innerHTML = rpTabs(); rpHighlight(null); rpPaintHint();
+    $("#rp-form").innerHTML = rpForm(); $("#rp-tabs").innerHTML = rpTabs(); rpHighlight(null, $("#rp")); rpPaintHint();
     const bar = $(".rp-bar"); if (bar && bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ block: "start" });
     if (!rpNarrow()) { const first = $$("#rp-form input[data-cell]").find((x) => !x.value) || $("#rp-form input[data-cell]"); if (first) first.focus({ preventScroll: true }); }
   }
@@ -792,18 +809,18 @@
   function rpCondOpen(open) {
     const side = $("#rp-side"), scrim = $("#rp-scrim"); if (!side) return;
     side.classList.toggle("open", open); if (scrim) scrim.hidden = !open;
-    if (open) { if (RP.focus) rpHighlight(RP.F[RP.focus.fk].rows[RP.focus.ri]); const x = $("#rp-side .rp-x"); if (x) x.focus({ preventScroll: true }); }
+    if (open) { if (RP.focus) rpHighlight(RP.F[RP.focus.fk].rows[RP.focus.ri], $("#rp")); const x = $("#rp-side .rp-x"); if (x) x.focus({ preventScroll: true }); }
   }
   function rpAct(act, ac) {
     if (act === "rp-tab") rpSetTab(ac.dataset.fk);
     else if (act === "rp-mode") { S.forms.mode = ac.dataset.mode === "exam" ? "exam" : "learn"; save(); route(); }
     else if (act === "rp-op") { const o = rpOps(), k = ac.dataset.op; o[k] = o[k] ? 0 : 1; save(); const li = ac.closest("li"); li.classList.toggle("done", !!o[k]); ac.setAttribute("aria-pressed", String(!!o[k])); const n = $("#rp-ops-n"); if (n) n.textContent = rpOpsLabel(); }
-    else if (act === "rp-q") { const inp = $(`#rp-form tr[data-ri="${ac.dataset.ri}"] input[data-cell]`); if (inp) inp.focus(); }
+    else if (act === "rp-q") { const inp = ac.closest("tr").querySelector("input[data-cell]"); if (inp) inp.focus(); }
     else if (act === "rp-calc") { RP.calcOpen[ac.dataset.id] = 1; rpPaintHint(); }
     else if (act === "rp-sum") {
-      const id = ac.dataset.cell, [fk, ri, ci] = id.split("."), r = RP.F[fk].rows[+ri], own = rpOwnSum(fk, r, +ci), inp = $(`#rp-form input[data-cell="${id}"]`);
+      const id = ac.dataset.cell, [fk, ri, ci] = id.split("."), r = RP.F[fk].rows[+ri], own = rpOwnSum(fk, r, +ci), host = ac.closest(".rp-host"), mini = host.classList.contains("rp-mini"), inp = $(`input[data-cell="${id}"]`, host);
       if (own.missing.length) { toast(`Сначала заполни: ${own.missing.join(", ")}`); if (inp) inp.focus(); return; }
-      rpData()[id] = String(own.v); save(); if (inp) { inp.value = G.fmt(own.v); inp.removeAttribute("title"); rpMark(inp); inp.focus(); } rpAfterChange();
+      rpData()[id] = String(own.v); save(); if (inp) { inp.value = G.fmt(own.v); inp.removeAttribute("title"); rpMark(inp, mini); inp.dataset.orig = inp.value; inp.focus(); } if (mini) rpMiniAfter(host); else rpAfterChange();
     }
     else if (act === "rp-check") rpCheck(false);
     else if (act === "rp-show") rpCheck(true);
@@ -812,22 +829,100 @@
       const d = rpData(); Object.keys(d).forEach((k) => { if (k.startsWith(RP.fk + ".")) d[k] = ""; }); S.formsDone[RP.key + RP.fk] = false; if (RP.key === "base") S.formsDone.base = false; save(); rpSetTab(RP.fk);
     }
     else if (act === "rp-col") rpSetCol(+ac.dataset.col, true);
+    else if (act === "rp-cond-open" && ac.closest(".rp-mini")) { const c = $(".rp-mini-cond", ac.closest(".rp-mini")); if (c) { if (c.tagName === "DETAILS") c.open = true; c.scrollIntoView({ behavior: "smooth", block: "start" }); } }
     else if (act === "rp-cond-open") rpCondOpen(true);
+    else if (act === "rp-mcheck") rpMiniCheck(ac.closest(".rp-mini"));
+    else if (act === "rp-open") { S.forms.seed = 0; S.forms.tab = ac.dataset.fk || "pl"; save(); }
     else if (act === "rp-cond-close") rpCondOpen(false);
     else return false;
     return true;
   }
   /* В ячейку вошли — показываем то, что набирали (формулу), и выделяем всё: новое число заменит старое, как в таблицах */
-  document.addEventListener("focusin", (e) => { const t = e.target; if (!t.matches || !t.matches("#rp input[data-cell]")) return; const raw = rpData()[t.dataset.cell]; if (raw && t.value !== raw) t.value = raw; t.dataset.orig = t.value; if (t.value) { t.select(); t.dataset.sel = "1"; } rpFocus(t); });
+  /* ---------- Строки отчётов в уроках: задача с контрольной (18–22) по кусочкам ---------- */
+  // ключ@колонки: 0 — на конец года, 1 — на начало (только для баланса); «*» — все строки отчёта
+  const RP_LESSONS = {
+    "m2-l09": { rows: [["pl", "*"]] },
+    "m2-l13": { rows: [["cf", "*"]] },
+    "m2-l14": { rows: [["pl", ["net"]], ["cf", ["dsEnd"]], ["bs", ["ds@0", "nrp@0"]]] },
+    "m3-l08": { rows: [["bs", "*", [1]]] },
+    "m3-l09": { rows: [["bs", "*", [0]]] },
+    "m4-l03": { topic: 1, rows: [["pl", ["kom"]]] },
+    "m4-l06": { topic: 1, rows: [["cf", ["buyers", "sup"]]] },
+    "m4-l13": { topic: 1, rows: [["pl", ["rev", "cost", "gross"]], ["bs", ["zap@0"]]] },
+    "m4-l16": { topic: 1, rows: [["cf", ["pay"]], ["bs", ["kz@0"]]] },
+    "m5-l09": { topic: 1, rows: [["bs", ["os", "vna"]]] },
+    "m6-l01": { topic: 1, rows: [["pl", ["bondAcc"]], ["cf", ["bondRec"]], ["bs", ["dz@0", "fv"]]] },
+    "m6-l06": { topic: 1, rows: [["pl", ["loanAcc"]], ["cf", ["loanPaid"]], ["bs", ["zs@0"]]] },
+    "m6-l14": { topic: 1, rows: [["bs", ["uk", "nrp", "sk"]]] },
+    "m7-l04": { topic: 1, rows: [["pl", ["tax", "net"]], ["cf", ["taxPaid"]]] },
+  };
+  const RP_NAMES = { pl: "ОФР", cf: "ОДДС", bs: "Баланс" };
+  function rpMiniItems(spec) {
+    return spec.rows.map(([fk, keys, cols]) => {
+      const f = RP.F[fk], all = keys === "*", list = (all ? f.rows.filter((r) => r.k).map((r) => r.k) : keys).map((x) => { const [k, c] = x.split("@"); return { k, cols: c ? c.split("").map(Number) : cols || f.cols.map((_, i) => i) }; });
+      return { fk, all, f, items: list.map(({ k, cols }) => ({ ...RP.by[fk][k], cols })).filter((x) => x.r) };
+    });
+  }
+  let RP_TOPIC = null;
+  function rpTopic(fk, k, ci) {
+    if (!RP_TOPIC) { RP_TOPIC = {}; const cur = { F: RP.F }; [false, true].forEach((topic) => Object.entries(RP_LESSONS).forEach(([lid, spec]) => { if (!!spec.topic !== topic) return; spec.rows.forEach(([f, keys, cols]) => { const list = keys === "*" ? cur.F[f].rows.filter((r) => r.k).map((r) => r.k) : keys; list.forEach((x) => { const [kk, c] = x.split("@"), cs = c ? c.split("").map(Number) : cols || [0, 1]; cs.forEach((cc) => { RP_TOPIC[`${f}.${kk}.${cc}`] = lid; }); }); }); })); }
+    return RP_TOPIC[`${fk}.${k}.${ci}`] || null;
+  }
+  function rpMini(lid) {
+    const spec = RP_LESSONS[lid]; if (!spec) return "";
+    rpEnsure(0); RP.focus = null; RP.calcOpen = {};
+    const d = rpData(), blocks = rpMiniItems(spec), ops = new Set(), osv = new Set();
+    blocks.forEach((b) => b.items.forEach(({ r }) => { (r.ops || []).forEach((o) => ops.add(o)); (r.osv || []).forEach((a) => osv.add(a)); }));
+    const cond = EX.tasks[17].cond, list = cond.find((b) => b.t === "list"), table = cond.find((b) => b.t === "table");
+    const big = blocks.some((b) => b.all) || ops.size > 4;
+    const osvRows = table.rows.filter((r) => big || osv.has(String(r[0]).trim()));
+    const osvHTML = osvRows.length ? `<div class="rp-osv"><table><thead><tr>${table.head.map((h, i) => `<th class="${i > 1 ? "r" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${osvRows.map((r) => `<tr data-acc="${esc(String(r[0]).trim())}">${r.map((c, i) => `<td class="${i > 1 ? "r" : ""}">${md(String(c))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : "";
+    const opsHTML = `<ol class="rp-ops plain">${list.items.map((it, i) => { const k = RP.opKeys[i]; return big || ops.has(k) ? `<li data-op="${k}"><span class="op-n">${i + 1}</span><span class="op-t">${md(it)}</span></li>` : ""; }).join("")}</ol>`;
+    const condHTML = big ? `<details class="rp-mini-cond"><summary>Условие задачи с контрольной <span class="tiny muted">ведомость и операции за год</span></summary>${osvHTML}${opsHTML}</details>`
+      : `<div class="rp-mini-cond"><p class="rp-mini-label">Что нужно из условия</p>${osvHTML}${opsHTML}</div>`;
+    const tables = blocks.map(({ fk, all, f, items }) => {
+      const used = [...new Set(items.flatMap((x) => x.cols))].sort();
+      const rowsHTML = (all ? f.rows.map((r, ri) => r.sec ? { sec: r.sec } : items.find((x) => x.ri === ri)).filter(Boolean) : items).map((x) => x.sec
+        ? `<tr class="sec"><td class="rp-code"></td><td colspan="${used.length + 1}">${esc(x.sec)}</td></tr>`
+        : `<tr class="rp-row${x.r.sum ? " sum" : ""}" data-fk="${fk}" data-ri="${x.ri}"><td class="rp-code">${esc(x.r.code || "")}</td><td class="rp-label"><span>${esc(x.r.l)}</span><button class="rp-q" data-act="rp-q" tabindex="-1" aria-label="Подсказка: ${esc(x.r.l)}">?</button></td>${used.map((ci) => x.cols.includes(ci) ? rpCell(fk, f, x.r, x.ri, ci, d, true) : `<td class="r rp-cell"><span class="faint">—</span></td>`).join("")}</tr>`).join("");
+      return `<div class="rp-mini-h"><b>${RP_NAMES[fk]}</b><span class="tiny faint">${esc(f.title)}, тыс. руб.</span></div><div class="statement rp-table"><table><thead><tr><th class="rp-code">Код</th><th>Показатель</th>${used.map((ci) => `<th class="r">${esc(f.cols[ci])}</th>`).join("")}</tr></thead><tbody>${rowsHTML}</tbody></table></div>`;
+    }).join("");
+    return `<div class="section" id="sec-rp"><h2>Строки в отчётах</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задача с контрольной, задания 18–22. Посчитай строки по теме урока: встань в ячейку, и появится подсказка. Ответы сохраняются в «Собери отчёты сам».</p>
+      <div class="rp-host rp-mini" data-lesson="${lid}">${condHTML}${tables}
+      <div class="rp-actions"><button class="pill ink" data-act="rp-mcheck">Проверить</button><a class="pill" href="#/reports" data-act="rp-open" data-fk="${blocks[0].fk}">Собрать отчёты целиком ${ICON.next}</a><span class="tiny muted rp-mstat">${rpMiniStatText(lid)}</span></div>
+      <div class="fb-slot rp-mfb"></div><p class="rp-keys tiny faint">Enter — следующая ячейка. Считать можно прямо в ячейке: 45000+350000−52000. Σ сложит строки отчёта.</p></div></div>`;
+  }
+  function rpMiniCount(lid) {
+    rpEnsure(0); const d = rpData(); let total = 0, ok = 0;
+    rpMiniItems(RP_LESSONS[lid]).forEach(({ fk, items }) => items.forEach(({ r, ri, cols }) => cols.forEach((ci) => { total++; if (rpOk(r, ci, d[`${fk}.${ri}.${ci}`])) ok++; })));
+    return { total, ok };
+  }
+  function rpMiniStatText(lid) { const c = rpMiniCount(lid); return c.ok === c.total ? "все строки сошлись" : `верно ${c.ok} из ${c.total}`; }
+  function rpMiniAfter(host) {
+    const st = $(".rp-mstat", host); if (st) st.textContent = rpMiniStatText(host.dataset.lesson);
+    RP_FORMS.forEach(([fk]) => { const x = rpStat(fk); if (x.ok === x.total && !x.done) rpMarkDone(fk); });
+    const c = rpMiniCount(host.dataset.lesson), toc = $('.toc a[data-scroll="sec-rp"]'); if (toc) toc.classList.toggle("done", c.ok === c.total);
+    if (RP.focus) rpPaintHint();
+  }
+  function rpMiniCheck(host) {
+    $$("input[data-cell]", host).forEach((inp) => rpMark(inp, true));
+    const c = rpMiniCount(host.dataset.lesson), slot = $(".rp-mfb", host);
+    slot.innerHTML = c.ok === c.total ? `<div class="fb ok"><b>Все строки урока сошлись</b>Они уже стоят в «Собери отчёты сам»: можно собрать отчёты целиком.</div>`
+      : `<div class="fb bad"><b>Верно ${c.ok} из ${c.total}</b>Неверные и пустые ячейки — встань в такую ячейку, и появится подсказка с расчётом.</div>`;
+    rpMiniAfter(host);
+  }
+  document.addEventListener("focusin", (e) => { const t = e.target; if (!t.matches || !t.matches(".rp-host input[data-cell]")) return; const raw = rpData()[t.dataset.cell]; if (raw && t.value !== raw) t.value = raw; t.dataset.orig = t.value; if (t.value) { t.select(); t.dataset.sel = "1"; } rpFocus(t); });
   document.addEventListener("mousedown", (e) => { if (e.target.closest && e.target.closest("#rp-hint-side button, .rp-hint-in button, .sigma, .rp-q")) e.preventDefault(); });
-  document.addEventListener("mouseup", (e) => { const t = e.target; if (t.dataset && t.dataset.sel && t.matches("#rp input[data-cell]")) { e.preventDefault(); delete t.dataset.sel; } });
+  document.addEventListener("mouseup", (e) => { const t = e.target; if (t.dataset && t.dataset.sel && t.matches(".rp-host input[data-cell]")) { e.preventDefault(); delete t.dataset.sel; } });
   document.addEventListener("input", (e) => { if (e.target.dataset && e.target.dataset.sel) delete e.target.dataset.sel; }, true);
-  document.addEventListener("focusout", (e) => { const t = e.target; if (t.matches && t.matches("#rp input[data-cell]") && RP.F) rpCommit(t); });
+  document.addEventListener("focusout", (e) => { const t = e.target; if (t.matches && t.matches(".rp-host input[data-cell]") && RP.F) rpCommit(t); });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && $("#rp-side.open")) { rpCondOpen(false); return; }
-    const t = e.target; if (!t.matches || !t.matches("#rp input[data-cell]")) return;
+    const t = e.target; if (!t.matches || !t.matches(".rp-host input[data-cell]")) return;
     const dir = e.key === "Enter" ? (e.shiftKey ? -1 : 1) : e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0; if (!dir) return;
     e.preventDefault();
+    const mhost = t.closest(".rp-mini");
+    if (mhost) { const all = $$("input[data-cell]", mhost), nx = all[all.indexOf(t) + dir]; if (nx) { nx.focus(); nx.select(); } else if (e.key === "Enter") { t.blur(); const b = $('[data-act="rp-mcheck"]', mhost); if (b) b.focus(); } return; }
     const ci = t.dataset.cell.split(".")[2], col = $$(`#rp-form input[data-cell$=".${ci}"]`);
     let next = col[col.indexOf(t) + dir];
     if (!next && e.key === "Enter" && dir > 0) next = $$(`#rp-form input[data-cell$=".${+ci + 1}"]`)[0];
@@ -865,7 +960,7 @@
     const pool = cardPool(mid), box = (c) => S.cards[c.key] || 1;
     if (!cardSess || cardSess.mid !== mid) { const sorted = seeded(pool, "s" + Math.floor(Date.now() / 86400000)).map((x) => x.v).sort((a, b) => box(a) - box(b)); cardSess = { mid, queue: sorted, flipped: false }; }
     const c = cardSess.queue[0], counts = [1, 2, 3].map((b) => pool.filter((x) => box(x) === b).length), write = !!S.cardWrite && c && c.kw;
-    const modeChips = `<div class="chips" style="margin-bottom:14px;justify-content:center"><button class="chip ${S.cardWrite ? "" : "on"}" data-act="card-mode" data-v="0">Переворачивать</button><button class="chip ${S.cardWrite ? "on" : ""}" data-act="card-mode" data-v="1">Писать ответ</button></div>`;
+    const modeChips = !pool.some((x) => x.kw) ? "" : `<div class="chips" style="margin-bottom:14px;justify-content:center"><button class="chip ${S.cardWrite ? "" : "on"}" data-act="card-mode" data-v="0">Переворачивать</button><button class="chip ${S.cardWrite ? "on" : ""}" data-act="card-mode" data-v="1">Писать ответ</button></div>`;
     if (write) { const qid = `card.${c.key}.${cardSess.n || 0}`; EPH[qid] = { type: "open", q: c.q, kw: c.kw, need: c.need, model: c.a, why: c.a }; }
     return `${crumbs([["", "Главная"], ["bank", "Банк заданий"], ["", "Карточки"]])}${trainTabs("cards")}<div class="pagehead" style="margin-bottom:16px"><div><h1 class="h-xl">Карточки</h1></div></div>
     <div class="chips" style="margin-bottom:18px"><a class="chip ${!mid ? "on" : ""}" href="#/cards">Все</a>${MODS.filter((m) => (m.flashcards || []).length).map((m) => `<a class="chip ${mid === m.id ? "on" : ""}" href="#/cards/${m.id}">${esc(SHORT[m.id] || m.title)}</a>`).join("")}</div>
@@ -1095,7 +1190,7 @@
     else if (r === "plan") html = a === "auto" || !dpActive() ? viewPlan() : viewDays(a);
     else if (r === "notes") html = viewNotes();
     else if (r === "account") html = viewAccount();
-    else if (r === "bank") html = a === "open" ? viewOpenBank() : a ? viewBankType(+a) : viewBank();
+    else if (r === "bank") html = a === "open" ? (OPENQ.length ? viewOpenBank() : viewBank()) : a ? viewBankType(+a) : viewBank();
     else if (r === "variants") html = viewVariants();
     else if (r === "v") html = parts[2] === "study" ? viewVariantStudy(+a) : parts[2] === "print" ? viewVariantPrint(+a) : viewVariant(+a);
     else if (r === "schemes") { const gs = [...new Set(SCHEMES.map((x) => x.group))]; html = viewSchemes(a != null && a !== "" ? gs[+a] : null); }
