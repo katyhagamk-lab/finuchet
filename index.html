@@ -43,6 +43,11 @@ a{color:inherit;text-decoration:none}
 .round svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .round.sm{width:34px;height:34px}.round.sm svg{width:16px;height:16px}
 .bottombar{display:none}
+/* Кнопка «Все предметы»: одинаковая и на одном месте (слева в шапке) во всех платформах */
+.hub-btn{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 16px 0 12px;border-radius:999px;background:#fff;color:#1B1C1F;font-size:15px;font-weight:450;white-space:nowrap;flex:none;box-shadow:0 1px 4px rgba(0,0,0,.08);transition:transform .15s var(--ease)}
+.hub-btn:hover{transform:scale(1.03)}.hub-btn:active{transform:scale(.97)}
+.hub-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+@media (max-width:1180px){.hub-btn{width:44px;padding:0;justify-content:center}.hub-btn span{display:none}}
 
 /* Типографика */
 .h-xl{font-size:clamp(38px,5.2vw,64px);font-weight:400;letter-spacing:-.034em;line-height:1.02}
@@ -2229,7 +2234,7 @@ window.DAYPLAN = {
     },
     {
       date: "2026-11-09", short: "Вложения, кредит, Вариант 1", title: "Вложения, кредит, капитал и первый вариант на время",
-      note: "Финансовые вложения, кредиты и капитал закрывают последние задания: 14, 15, 16 и 6. После этого ты прошла все 22 задания. Вечером Вариант 1 на 90 минут, как настоящая контрольная, и разбор ошибок.",
+      note: "Финансовые вложения, кредиты и капитал закрывают последние задания: 14, 15, 16 и 6. После этого все 22 задания пройдены. Вечером Вариант 1 на 90 минут, как настоящая контрольная, и разбор ошибок.",
       items: [
         { t: "lesson", id: "m6-l01" },
         { t: "lesson", id: "m6-l02" },
@@ -2290,6 +2295,11 @@ window.DAYPLAN = {
   let S = DEF(), memoryOnly = false;
   try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(DEF(), JSON.parse(raw)); } catch (e) { memoryOnly = true; }
   if (!S.examDate && window.DAYPLAN) S.examDate = window.DAYPLAN.exam;
+  /* Дату можно поменять и на общей странице «Учёба»: берём ту, что изменили позже */
+  try { const hd = JSON.parse(localStorage.getItem("ucheba:date:finuchet") || "null"); if (hd && hd.at > (S.examDateAt || 0) && /^\d{4}-\d{2}-\d{2}$/.test(hd.date || "")) { S.examDate = hd.date; S.examDateAt = hd.at; } } catch (e) {}
+  const yearOk = (v) => { const y = +String(v).slice(0, 4), cy = new Date().getFullYear(); return /^\d{4}-\d{2}-\d{2}$/.test(v) && y >= cy - 1 && y <= cy + 2; };
+  const dateMin = () => `${new Date().getFullYear() - 1}-01-01`, dateMax = () => `${new Date().getFullYear() + 2}-12-31`;
+  let dateTimer = null;
   const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { memoryOnly = true; } hubSum(); };
   /* ---------- Итог для общей страницы «Учёба» (../ucheba/): она читает его и показывает прогресс по предмету ---------- */
   const HUB_URL = /(^|\.)github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname) ? "../ucheba/" : "https://katyhagamk-lab.github.io/ucheba/";
@@ -2334,7 +2344,7 @@ window.DAYPLAN = {
     o.days = Object.assign({}, b.days || {}); Object.entries(a.days || {}).forEach(([k, v]) => { o.days[k] = Math.max(v, o.days[k] || 0); });
     const hist = [...((b.mock || {}).history || []), ...((a.mock || {}).history || [])], seen = new Set();
     o.mock = { active: (a.mock || {}).active || (b.mock || {}).active || null, history: hist.filter((r) => { const k = r.ts + ":" + r.mode + ":" + (r.v || ""); if (seen.has(k)) return false; seen.add(k); return true; }).sort((x, y) => x.ts - y.ts) };
-    o.examDate = a.examDate || b.examDate || ""; o.planMode = a.planMode || b.planMode;
+    { const ea = a.examDateAt || 0, eb = b.examDateAt || 0; o.examDate = (eb > ea ? b.examDate || a.examDate : a.examDate || b.examDate) || ""; o.examDateAt = Math.max(ea, eb); } o.planMode = a.planMode || b.planMode;
     return o;
   }
   let pushTimer = null, dirty = false;
@@ -2436,7 +2446,7 @@ window.DAYPLAN = {
       case "example": return `<div class="b-ex"><h4>${md(b.title)}</h4>${b.given ? `<p class="given">${md(b.given)}</p>` : ""}<ol>${b.steps.map((s) => `<li><span>${md(s)}</span></li>`).join("")}</ol>${b.result ? `<span class="res">${md(b.result)}</span>` : ""}</div>`;
       case "entries": return `<div>${b.caption ? `<div class="tbl-cap">${md(b.caption)}</div>` : ""}<div class="tbl-wrap"><table><thead><tr><th>Операция</th><th>Дебет</th><th>Кредит</th><th class="r">Сумма</th></tr></thead><tbody>${b.rows.map((r) => `<tr><td>${md(r.op)}</td><td>${md(r.dt)}</td><td>${md(r.kt)}</td><td class="r">${md(r.sum)}</td></tr>`).join("")}</tbody></table></div></div>`;
       case "eq": return `<div>${b.caption ? `<div class="tbl-cap">${md(b.caption)}</div>` : ""}<div class="tbl-wrap"><table><thead><tr><th>Операция</th><th>Активы</th><th>Капитал</th><th>Обязательства</th></tr></thead><tbody>${b.rows.map((r) => `<tr><td>${md(r.op)}</td><td class="eq-a">${md(r.a)}</td><td class="eq-k">${md(r.k)}</td><td class="eq-o">${md(r.o)}</td></tr>`).join("")}</tbody></table></div></div>`;
-      case "note": { const sp = b.kind === "exam" ? spoilerTasks(b.text) : []; if (sp.length) return `<details class="b-note exam spoiler"><summary><b>${sp.length > 1 ? `Подсказка к заданиям ${sp.join(" и ")}` : `Подсказка к заданию ${sp[0]}`} контрольной</b><span class="tiny">Внутри подсказка к ответу. Сначала попробуй решить ${sp.map((n) => `<a href="#/exam/${n}">задание ${n}</a>`).join(" и ")} сама.</span></summary><span>${md(b.text)}</span></details>`; return `<div class="b-note ${b.kind}"><b>${NOTE[b.kind] || ""}</b><span>${md(b.text)}</span></div>`; }
+      case "note": { const sp = b.kind === "exam" ? spoilerTasks(b.text) : []; if (sp.length) return `<details class="b-note exam spoiler"><summary><b>${sp.length > 1 ? `Подсказка к заданиям ${sp.join(" и ")}` : `Подсказка к заданию ${sp[0]}`} контрольной</b><span class="tiny">Внутри подсказка к ответу. Сначала попробуй решить ${sp.map((n) => `<a href="#/exam/${n}">задание ${n}</a>`).join(" и ")} самостоятельно.</span></summary><span>${md(b.text)}</span></details>`; return `<div class="b-note ${b.kind}"><b>${NOTE[b.kind] || ""}</b><span>${md(b.text)}</span></div>`; }
       case "case": return renderCase(b.part);
       case "scheme": { const x = SCHEMES.find((y) => y.id === b.id); return x ? schemeFigure(x) : ""; }
       default: return "";
@@ -2570,7 +2580,7 @@ window.DAYPLAN = {
   const navKey = (r) => ({ m: "theory", l: "theory", p: "theory", theory: "theory", exam: "exam", mock: "exam", reports: "exam", variants: "exam", v: "exam", notes: "exam", bank: "bank", train: "bank", cards: "bank", mistakes: "bank", plan: "", cheat: "schemes", schemes: "schemes" }[r] ?? "");
   function shell(route, html) {
     const key = navKey(route);
-    app.innerHTML = `<div class="shell"><header class="top"><a class="round hub-link" href="${HUB_URL}" aria-label="Все предметы" title="Все предметы">${ICON.hub}</a><a class="brand" href="#/"><i></i>Финучёт</a><nav class="seg" aria-label="Разделы">${NAV.map(([k, t]) => `<a href="#/${k}" class="${k === key ? "on" : ""}">${t}</a>`).join("")}</nav><button class="round" data-act="search" aria-label="Поиск">${ICON.search}</button><a class="round acc-btn ${route === "account" ? "on" : ""}" href="#/account" aria-label="Аккаунт">${ICON.user}<i id="acc-dot" class="acc-dot ${accCode && cloudOn() ? sync.state : "off"}"></i></a><button class="round" data-act="settings" aria-label="Настройки">${ICON.gear}</button></header><main id="view">${html}</main></div><nav class="bottombar" aria-label="Разделы">${NAV.map(([k, , t]) => `<a href="#/${k}" class="${k === key ? "on" : ""}">${t}</a>`).join("")}</nav>`;
+    app.innerHTML = `<div class="shell"><header class="top"><a class="hub-btn" href="${HUB_URL}" aria-label="Все предметы" title="Все предметы">${ICON.hub}<span>Все предметы</span></a><a class="brand" href="#/"><i></i>Финучёт</a><nav class="seg" aria-label="Разделы">${NAV.map(([k, t]) => `<a href="#/${k}" class="${k === key ? "on" : ""}">${t}</a>`).join("")}</nav><button class="round" data-act="search" aria-label="Поиск">${ICON.search}</button><a class="round acc-btn ${route === "account" ? "on" : ""}" href="#/account" aria-label="Аккаунт">${ICON.user}<i id="acc-dot" class="acc-dot ${accCode && cloudOn() ? sync.state : "off"}"></i></a><button class="round" data-act="settings" aria-label="Настройки">${ICON.gear}</button></header><main id="view">${html}</main></div><nav class="bottombar" aria-label="Разделы">${NAV.map(([k, , t]) => `<a href="#/${k}" class="${k === key ? "on" : ""}">${t}</a>`).join("")}</nav>`;
   }
   const crumbs = (items) => `<nav class="crumbs">${items.map(([h, t], i) => (h ? `<a href="#/${h}">${esc(t)}</a>` : `<b style="font-weight:450;color:var(--ink)">${esc(t)}</b>`) + (i < items.length - 1 ? "<span>/</span>" : "")).join("")}</nav>`;
 
@@ -2646,7 +2656,7 @@ window.DAYPLAN = {
       <p class="dp-note">${esc(cur.note)}</p>
       <div class="dp-bar" aria-hidden="true"><b style="width:${list.length ? Math.round((done / list.length) * 100) : 0}%"></b></div>
       <p class="tiny ${cur.date === DP.exam ? "" : "muted"}" style="margin:8px 0 6px">Всего примерно ${hrs(total)}, осталось ${hrs(dpLeftMin(list))}</p>
-      ${behind.length ? `<div class="dp-behind"><h3 class="h-sm">Не успела раньше</h3><p class="tiny muted" style="margin:2px 0 4px">Начни с этого, если остаётся время. Сквозную задачу и варианты не пропускай.</p>${behind.map((x) => dpRow(x, true)).join("")}</div>` : ""}
+      ${behind.length ? `<div class="dp-behind"><h3 class="h-sm">Осталось с прошлых дней</h3><p class="tiny muted" style="margin:2px 0 4px">Начни с этого, если остаётся время. Сквозную задачу и варианты не пропускай.</p>${behind.map((x) => dpRow(x, true)).join("")}</div>` : ""}
       <div class="dp-list">${list.map((x) => dpRow(x)).join("")}</div>
     </section>
     ${allDone ? `<div class="b-note exam" style="margin-top:14px"><b>План пройден</b><span>Если есть время, реши ещё один вариант на время или сквозную задачу с новыми числами.</span></div>` : ""}`;
@@ -2684,7 +2694,7 @@ window.DAYPLAN = {
     </section>
     <section class="main-grid">
       <div class="mesh mesh-green bigcard"><div class="ttl">Готовность к контрольной</div><div class="bignum dots">${ready}</div><div class="sub">${ready >= 80 ? "Можно идти писать" : ready >= 50 ? "Хороший темп" : ready > 0 ? "Подготовка идёт" : "Реши первое задание"}</div><div class="bars" aria-label="Готовность по 22 заданиям">${bars}</div></div>
-      <div class="mesh mesh-orange bigcard"><div class="ttl">Дата контрольной</div><div class="bignum dots">${left == null ? "–" : Math.max(0, left)}</div><div class="sub">${left == null ? "Укажи дату, чтобы разбить план по дням" : plural(Math.max(0, left), "день остался", "дня осталось", "дней осталось")}</div><input type="date" class="date-input" data-inp="examDate" aria-label="Дата контрольной" value="${esc(S.examDate)}"><div class="ruler" aria-hidden="true">${ruler}</div></div>
+      <div class="mesh mesh-orange bigcard"><div class="ttl">Дата контрольной</div><div class="bignum dots">${left == null ? "–" : Math.max(0, left)}</div><div class="sub">${left == null ? "Укажи дату, чтобы разбить план по дням" : plural(Math.max(0, left), "день остался", "дня осталось", "дней осталось")}</div><input type="date" class="date-input" data-inp="examDate" aria-label="Дата контрольной" min="${dateMin()}" max="${dateMax()}" value="${esc(S.examDate)}"><div class="ruler" aria-hidden="true">${ruler}</div></div>
       <div class="pending"><h3>${dn ? "Что делать сегодня" : next ? "Что делать дальше" : "Всё по плану пройдено"}</h3><a class="round sm" href="#/plan" style="position:absolute;right:16px;top:16px" aria-label="Весь план">${ICON.next}</a>
         ${next ? `<div style="display:grid;grid-template-columns:1fr auto;gap:14px;margin-top:14px;flex:1"><div style="display:flex;flex-direction:column"><span class="h-sm">${esc(next.title)}</span><span class="small muted" style="margin-top:4px">примерно ${next.min} минут${next.optional ? ", по желанию" : ""}</span><div class="slider" aria-hidden="true"><b style="width:${ready}%"></b><i style="left:${Math.max(2, ready)}%"></i></div><span class="tiny muted">${dn ? (() => { const d = dpToday(), l = dpItems(d); return dn.date < d.date ? `Хвост с ${dpDate(dn.date, { day: "numeric", month: "long" })}` : `${d.date === localDay() ? "Сегодня" : dpDate(d.date, { day: "numeric", month: "long" })}: сделано ${l.filter((x) => x.state === "done").length} из ${l.length}`; })() : `Шаг ${planItems().filter((i) => i.state === "done").length + 1} из ${planItems().length}`}</span></div><div style="background:rgba(255,255,255,.72);border-radius:26px;width:88px;display:grid;place-items:center"><div class="blob" style="--c:${next.l ? COLORS[next.l.mod.id] : "#F4802B"}"></div></div></div><a class="pill ink" href="#/${next.link}" style="margin-top:16px">Продолжить</a>` : `<p class="muted" style="margin:14px 0">Прогони ещё одну пробную с новыми числами, чтобы закрепить результат.</p><a class="pill ink" href="#/mock">Новая пробная</a>`}
       </div>
@@ -2740,7 +2750,7 @@ window.DAYPLAN = {
     const secs = l.sections.map((s, si) => `<section class="section" id="sec-${si}"><h2>${esc(s.title)}</h2><div class="blocks">${renderBlocks(s.blocks)}</div>${si === 0 && vizFor("lesson", l.id).length ? `<div style="margin-top:18px;display:flex;flex-direction:column;gap:14px">${vizFor("lesson", l.id).map(vizBlock).join("")}</div>` : ""}<div class="check"><div class="check-head"><span class="ring"></span><h3>Проверь себя</h3><span class="small muted" data-secstat="${si}"></span></div>${(s.quiz || []).map((q, qi) => quizHTML(`${l.id}.s${si}.q${qi}`, q)).join("")}</div></section>`).join("");
     const examLinks = (l.examTasks || []).map((n) => `<a class="tag lime" href="#/exam/${n}">Задание ${n}</a>`).join(" ");
     return `${crumbs([["", "Главная"], ["theory", "Теория"], [`m/${m.id}`, SHORT[m.id] || m.title], ["", l.title]])}
-    <div class="reader" data-lesson="${l.id}"><article><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что ты упустила.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
+    <div class="reader" data-lesson="${l.id}"><article><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что упущено.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
       <div class="glass" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-radius:28px"><button class="pill ghost" data-act="manual" data-id="${l.id}">${S.manual[l.id] ? "Снять отметку «изучено»" : "Отметить как изученный"}</button><div style="display:flex;gap:8px;flex-wrap:wrap">${prev ? `<a class="pill" href="#/l/${prev.id}">Назад</a>` : ""}${nxt ? `<a class="pill ink" href="#/l/${nxt.id}">Следующий урок</a>` : `<a class="pill ink" href="#/exam">К контрольной</a>`}</div></div></article>
     <aside class="toc"><h4>В этом уроке</h4>${l.sections.map((s, si) => `<a href="#/l/${l.id}" data-scroll="sec-${si}" data-toc="${si}" class="${secState(l, si)}"><i></i><span>${esc(s.title)}</span></a>`).join("")}${openFor(l.id).length ? `<a href="#/l/${l.id}" data-scroll="sec-open" class="${openFor(l.id).every((o) => isOk(`open.${o.id}`)) ? "done" : ""}"><i></i><span>Ответь своими словами</span></a>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<a href="#/l/${l.id}" data-scroll="sec-exam" class="${LESSON_EXAM[l.id].every((n) => isOk(`exam.${n}`)) ? "done" : ""}"><i></i><span>Задание с контрольной</span></a>` : ""}<div class="toc-progress" id="toc-progress">${tocProgress(l)}</div></aside></div>`;
   }
@@ -2972,7 +2982,7 @@ window.DAYPLAN = {
     return `${crumbs([["", "Главная"], ["", "План"]])}<div class="pagehead"><div><h1 class="h-xl">${dpActive() ? "Свой маршрут" : "План подготовки"}</h1><p class="muted" style="margin-top:10px;max-width:60ch">Полный маршрут идёт по порядку уроков, с нуля: каждое задание контрольной стоит после уроков, которые к нему готовят. Короткий маршрут только по заданиям: сначала сквозная задача 18–22, потом расчёты и тестовая часть.</p></div></div>
     ${dpActive() ? planTabs("auto") : ""}<div class="chips" style="margin-bottom:12px;align-items:center"><button class="chip ${fast ? "" : "on"}" data-act="plan-mode" data-mode="full">Полный маршрут: все уроки</button><button class="chip ${fast ? "on" : ""}" data-act="plan-mode" data-mode="fast">Короткий: только контрольная и пробные</button></div>
     ${!fast && perDay > 5 ? `<div class="b-note exam" style="margin-bottom:14px"><b>Времени мало</b><span>При этой дате полный маршрут требует примерно ${Math.round(perDay)} ч в день. Переключись на короткий: разборы всех 22 заданий, бланки отчётов и две пробные.</span></div>` : ""}
-    <div class="glass" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:16px;border-radius:24px"><label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="small">Дата контрольной</span><input type="date" class="num" style="width:auto;padding:7px 12px" data-inp="examDate" value="${esc(S.examDate)}"></label><span class="small muted">Сделано ${done} из ${core.length} шагов</span></div>
+    <div class="glass" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:16px;border-radius:24px"><label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="small">Дата контрольной</span><input type="date" class="num" style="width:auto;padding:7px 12px" data-inp="examDate" min="${dateMin()}" max="${dateMax()}" value="${esc(S.examDate)}"></label><span class="small muted">Сделано ${done} из ${core.length} шагов</span></div>
     ${left != null && left <= 0 ? `<p class="small muted" style="margin-bottom:12px">Эта дата уже наступила: выбери новую, чтобы разбить план по дням.</p>` : !S.examDate ? `<p class="small muted" style="margin-bottom:12px">Укажи дату, и план разобьётся по дням.</p>` : ""}${body}`;
   }
   function viewNotes() {
@@ -3015,7 +3025,7 @@ window.DAYPLAN = {
   function openSettings() {
     const ov = document.createElement("div"); ov.className = "overlay"; ov.id = "ov";
     ov.innerHTML = `<div class="modal" role="dialog" aria-label="Настройки"><div class="modal-body"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h2 class="h-md">Настройки</h2><button class="round sm" style="background:var(--card)" data-act="close-ov" aria-label="Закрыть">${ICON.x}</button></div>
-    <div class="settings-row"><span>Дата контрольной</span><input type="date" class="num" style="width:auto" data-inp="examDate" value="${esc(S.examDate)}"></div>
+    <div class="settings-row"><span>Дата контрольной</span><input type="date" class="num" style="width:auto" data-inp="examDate" min="${dateMin()}" max="${dateMax()}" value="${esc(S.examDate)}"></div>
     <div class="settings-row"><div><div>Аккаунт и облако</div><div class="small muted">Личный код, чтобы прогресс был на всех устройствах.</div></div><a class="pill" href="#/account" data-act="close-ov">Открыть</a></div>
     <div class="settings-row"><div><div>Сохранить прогресс в файл</div><div class="small muted">Пригодится при переносе на другой компьютер.</div></div><button class="pill" data-act="export">Скачать файл</button></div>
     <div class="settings-row"><div><div>Загрузить прогресс из файла</div><div class="small muted">Текущий прогресс заменится.</div></div><label class="pill" style="cursor:pointer">Выбрать файл<input type="file" accept=".json" id="import-file" hidden></label></div>
@@ -3113,7 +3123,7 @@ window.DAYPLAN = {
   function viewAccount() {
     const doneL = LESSONS.filter((l) => lessonState(l) === "done").length, solved = TASKS.filter((t) => isOk(`exam.${t.n}`)).length, answered = Object.keys(S.quiz).length;
     const stats = `<div class="acc-stats"><div><span class="dots">${doneL}</span><small>уроков пройдено</small></div><div><span class="dots">${solved}</span><small>заданий контрольной</small></div><div><span class="dots">${answered}</span><small>ответов сохранено</small></div><div><span class="dots">${S.mock.history.length}</span><small>пробных и вариантов</small></div></div>`;
-    const head = `${crumbs([["", "Главная"], ["", "Аккаунт"]])}<div class="pagehead"><div><h1 class="h-xl">Аккаунт</h1><p class="muted" style="margin-top:10px;max-width:60ch">Личный код хранит твой прогресс в облаке. Введи его на телефоне или другом компьютере, и всё, что ты решила, окажется там же.</p></div></div>`;
+    const head = `${crumbs([["", "Главная"], ["", "Аккаунт"]])}<div class="pagehead"><div><h1 class="h-xl">Аккаунт</h1><p class="muted" style="margin-top:10px;max-width:60ch">Личный код хранит твой прогресс в облаке. Введи его на телефоне или другом компьютере, и все решённые задания окажутся там же.</p></div></div>`;
     if (!cloudOn()) return `${head}<section class="mesh mesh-blue acc-hero"><h2 class="h-md">Облако ещё не подключено</h2><p>Прогресс уже сохраняется в этом браузере и не пропадает при обновлении страницы. Личный код заработает, как только будет подключено облачное хранилище.</p></section>${stats}`;
     if (accCode) return `${head}
       <section class="mesh mesh-blue acc-hero"><span class="small">Твой код аккаунта</span><div class="acc-code" id="acc-code">${esc(accCode)}</div><div class="acc-actions"><button class="pill" data-act="acc-copy">${ICON.copy}Скопировать код</button><button class="pill ghost" data-act="acc-sync">Синхронизировать сейчас</button></div><p class="small" id="sync-status">${syncText()}</p></section>
@@ -3299,7 +3309,13 @@ window.DAYPLAN = {
   });
   document.addEventListener("change", (e) => {
     const t = e.target;
-    if (t.dataset.inp === "examDate") { S.examDate = t.value; save(); if (!$("#ov")) route(); else { const v = $("#view"); route(); } }
+    if (t.dataset.inp === "examDate") {
+      /* Chrome шлёт change после каждой цифры года (0002, 0020…): ждём, пока год станет настоящим, и не перерисовываем страницу под пальцами */
+      const v = t.value; if (v && !yearOk(v)) return;
+      S.examDate = v; S.examDateAt = Date.now(); save();
+      try { localStorage.setItem("ucheba:date:finuchet", JSON.stringify({ date: v, at: S.examDateAt })); } catch (err) {}
+      clearTimeout(dateTimer); dateTimer = setTimeout(route, 700);
+    }
     if (t.id === "import-file" && t.files[0]) { const fr = new FileReader(); fr.onload = () => { try { const d = JSON.parse(fr.result); if (!d || d.v !== 1) throw 0; S = Object.assign(DEF(), d); save(); closeOv(); route(); toast("Прогресс загружен"); } catch (err) { toast("Это не файл прогресса платформы"); } }; fr.readAsText(t.files[0]); }
   });
   document.addEventListener("keydown", (e) => {
