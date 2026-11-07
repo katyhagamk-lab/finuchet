@@ -144,6 +144,13 @@
   const secQids = (l, si) => (l.sections[si].quiz || []).map((_, qi) => `${l.id}.s${si}.q${qi}`);
   const isOk = (q) => !!(S.quiz[q] && S.quiz[q].ok === true);
   const isTried = (q) => !!S.quiz[q];
+  /* Баллы по методичке: тест 2, расчёт с выбором 4, открытый расчёт 6 (сумма за 22 задания ровно 100) */
+  const MU = window.MU || null, AN = window.ANALYSIS || null;
+  const PTS = (n) => (MU && MU.points[n]) || 0;
+  const ptsWord = (p) => `${p} ${plural(p, "балл", "балла", "баллов")}`;
+  const recPts = (r) => (r.res || []).reduce((a, x) => a + (x.ok ? PTS(x.n) : 0), 0);
+  const recMax = (r) => (r.res || []).reduce((a, x) => a + PTS(x.n), 0) || 100;
+  const grade10 = (p, max) => String(Math.round((p / (max || 100)) * 100) / 10).replace(".", ",");
   const secState = (l, si) => { if (S.manual[l.id]) return "done"; const ids = secQids(l, si); if (ids.length && ids.every(isOk)) return "done"; return ids.some(isTried) ? "part" : "new"; };
   const lessonState = (l) => { if (S.manual[l.id]) return "done"; const ids = lessonQids(l); if (ids.length && ids.every(isOk)) return "done"; return ids.some(isTried) ? "part" : "new"; };
   const modProgress = (m) => { const ls = m.lessons || []; if (!ls.length) return 0; const done = ls.reduce((a, l) => { if (S.manual[l.id]) return a + 1; const ids = lessonQids(l); return a + (ids.length ? ids.filter(isOk).length / ids.length : 0); }, 0); return Math.round((done / ls.length) * 100); };
@@ -388,7 +395,7 @@
 
   /* ---------- Каркас ---------- */
   const NAV = [["", "Главная", "Главная"], ["plan", "План", "План"], ["theory", "Теория", "Теория"], ["exam", "Контрольная", "Контрольная"], ["bank", "Банк заданий", "Банк"], ["schemes", "Схемы", "Схемы"]];
-  const navKey = (r) => ({ m: "theory", l: "theory", p: "theory", theory: "theory", exam: "exam", mock: "exam", reports: "exam", variants: "exam", v: "exam", notes: "exam", bank: "bank", train: "bank", cards: "bank", mistakes: "bank", plan: "plan", cheat: "schemes", schemes: "schemes" }[r] ?? "");
+  const navKey = (r) => ({ m: "theory", l: "theory", p: "theory", theory: "theory", exam: "exam", mock: "exam", reports: "exam", variants: "exam", v: "exam", notes: "exam", mu: "exam", bank: "bank", train: "bank", cards: "bank", mistakes: "bank", plan: "plan", cheat: "schemes", schemes: "schemes" }[r] ?? "");
   function shell(route, html) {
     const key = navKey(route);
     app.innerHTML = `<div class="shell"><header class="top"><a class="hub-btn" href="${HUB_URL}" aria-label="Все предметы" title="Все предметы">${ICON.hub}<span>Все предметы</span></a><a class="brand" href="#/"><i></i>Финучёт</a><nav class="seg" aria-label="Разделы">${NAV.map(([k, t]) => `<a href="#/${k}" class="${k === key ? "on" : ""}">${t}</a>`).join("")}</nav><button class="round" data-act="search" aria-label="Поиск">${ICON.search}</button><a class="round acc-btn ${route === "account" ? "on" : ""}" href="#/account" aria-label="Аккаунт">${ICON.user}<i id="acc-dot" class="acc-dot ${accCode && cloudOn() ? sync.state : "off"}"></i></a><button class="round" data-act="settings" aria-label="Настройки">${ICON.gear}</button></header><main id="view">${html}</main></div><nav class="bottombar" aria-label="Разделы">${NAV.map(([k, , t]) => `<a href="#/${k}" class="${k === key ? "on" : ""}">${t}</a>`).join("")}</nav>`;
@@ -409,12 +416,12 @@
     }
     const hist = S.mock.history.length;
     out.push({ kind: "tool", title: "Собрать отчёты по задаче контрольной своими руками", min: 40, link: "reports", state: S.formsDone.base ? "done" : "new" });
-    out.push({ kind: "mock", title: "Первая пробная контрольная", min: 90, link: "mock", state: hist >= 1 ? "done" : "new" });
+    out.push({ kind: "mock", title: "Первая пробная контрольная", min: 80, link: "mock", state: hist >= 1 ? "done" : "new" });
     out.push({ kind: "tool", title: "Работа над ошибками", min: 30, link: "mistakes", state: hist >= 1 && !mistakes().length ? "done" : "new" });
     const vh = (k) => S.mock.history.some((r) => r.mode === "var" && r.v === k);
-    out.push({ kind: "mock", title: "Вариант 1 на время", min: 90, link: "v/1", state: vh(1) ? "done" : "new" });
+    out.push({ kind: "mock", title: "Вариант 1 на время", min: 80, link: "v/1", state: vh(1) ? "done" : "new" });
     out.push({ kind: "tool", title: "Работа над ошибками варианта", min: 20, link: "mistakes", state: vh(1) && !mistakes().length ? "done" : "new" });
-    out.push({ kind: "mock", title: "Вариант 2 на время", min: 90, link: "v/2", state: vh(2) ? "done" : "new" });
+    out.push({ kind: "mock", title: "Вариант 2 на время", min: 80, link: "v/2", state: vh(2) ? "done" : "new" });
     if (!fast) LESSONS.filter((l) => !used.has(l.id)).forEach((l) => out.push({ kind: "lesson", l, optional: true, title: l.title, min: l.minutes || 12, link: `l/${l.id}`, state: lessonState(l) }));
     return out;
   }
@@ -425,7 +432,7 @@
   const localDay = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const dpActive = () => !!(DP && localDay() <= DP.exam);
   const dpDate = (s, o) => new Date(s + "T12:00:00").toLocaleDateString("ru-RU", o);
-  const DP_KIND = { lesson: "Урок", exam: "Контрольная", bank: "Банк", train: "Тренажёр", case: "Тренажёр", variant: "Вариант", mistakes: "Ошибки", open: "Своими словами", notes: "Спорные места", cheat: "Шпаргалка", cards: "Карточки", reports: "Бланки", schemes: "Схемы" };
+  const DP_KIND = { lesson: "Урок", exam: "Контрольная", bank: "Банк", train: "Тренажёр", case: "Тренажёр", variant: "Вариант", mistakes: "Ошибки", open: "Своими словами", notes: "Спорные места", mu: "Методичка", cheat: "Шпаргалка", cards: "Карточки", reports: "Бланки", schemes: "Схемы" };
   const varDone = (v) => S.mock.history.some((r) => r.mode === "var" && r.v === v);
   function dpItem(d, it, i) {
     let title = it.title || "", min = it.min || 10, link = "", auto = null, hint = "", key = `dp.${d.date}.${it.t}.${it.id || (it.ns || []).join("-") || it.v || it.n || (it.ids || []).join("-") || it.mod || i}`;
@@ -438,7 +445,7 @@
     else if (it.t === "open") { link = "bank/open"; auto = cnt(OPENQ.filter((o) => isOk(`open.${o.id}`)).length, it.count || 10); }
     else if (it.t === "reports") { link = "reports"; auto = S.formsDone.base ? "done" : "new"; }
     else if (it.t === "mistakes") { link = "mistakes"; const v = d.items.find((x) => x.t === "variant"); if (v && varDone(v.v) && !mistakes().length) auto = "done"; }
-    else link = it.t === "cards" && it.mod ? `cards/${it.mod}` : { notes: "notes", cheat: "cheat", cards: "cards", schemes: "schemes" }[it.t] || "";
+    else link = it.t === "cards" && it.mod ? `cards/${it.mod}` : { notes: "notes", cheat: "cheat", cards: "cards", schemes: "schemes", mu: "mu" }[it.t] || "";
     const man = !!S.manual[key], state = man || auto === "done" ? "done" : auto === "part" ? "part" : "new";
     return { key, title, min, link, state, man, auto, hint, kind: DP_KIND[it.t] || "", date: d.date, ns: it.ns || null, l: it.t === "lesson" ? LMAP[it.id] : null, schemes: it.t === "schemes" ? (it.ids || []).map((id) => SCHEMES.find((x) => x.id === id)).filter(Boolean) : null };
   }
@@ -547,7 +554,7 @@
         </div>
       </div>
       <a href="#/mistakes" class="white side-card"><h3>Работа над ошибками</h3><span class="round sm" style="background:var(--card)">${ICON.plus}</span><span class="dots" style="font-size:46px">${errs}</span><span class="tiny muted">${errs ? "Реши заново всё, что не вышло" : "Сюда попадут неверные ответы"}</span></a>
-      <a href="#/mock" class="mesh mesh-pink side-card" style="border-radius:var(--r-lg);padding:18px"><h3>Пробная контрольная</h3><span class="round sm" style="color:var(--ink)">${ICON.plus}</span><div class="target"></div><span class="tiny" style="text-align:center;opacity:.95">${hist ? `Прошлый результат ${hist.score} из ${hist.total}` : "22 задания на время"}</span></a>
+      <a href="#/mock" class="mesh mesh-pink side-card" style="border-radius:var(--r-lg);padding:18px"><h3>Пробная контрольная</h3><span class="round sm" style="color:var(--ink)">${ICON.plus}</span><div class="target"></div><span class="tiny" style="text-align:center;opacity:.95">${hist ? `Прошлый результат ${recPts(hist)} из ${recMax(hist)} баллов` : "22 задания на 80 минут"}</span></a>
     </section>
     <section class="track" aria-label="Дорожка уроков">
       ${next ? `<a class="track-pill" href="#/${next.link}" style="left:${Math.max(16, Math.min(84, pillPos))}%"><span class="ring" style="width:18px;height:18px"></span><span>${esc(next.title.length > 42 ? next.title.slice(0, 40) + "…" : next.title)}<small>Следующий шаг</small></span></a>` : ""}
@@ -568,6 +575,8 @@
     <div class="sechead"><h2 class="h-lg">Инструменты</h2></div>
     <div class="tr-grid">
       ${toolCard("plan", "План подготовки", dpActive() ? `Что делать каждый день до ${dpDate(DP.exam, { day: "numeric", month: "long" })}: уроки, задания контрольной и два варианта на время.` : "Расписание по дням от даты контрольной: сначала то, что даёт больше всего заданий.", "#6E9BE8", dpActive() ? "По дням" : "")}
+      ${MU ? toolCard("mu", "Правила и баллы", "Формат по методичке: 80 минут, 100 баллов, критерии развёрнутого ответа и чек-лист тем со ссылками на уроки.", "#F4802B", "Методичка") : ""}
+      ${AN ? toolCard("train/analysis", "Развёрнутый ответ на 8 баллов", "Анализ отчётности и письменный вывод: расчёт, что повлияло, вывод и рекомендация.", "#2C9F57", "8 баллов") : ""}
       ${toolCard("reports", "Собери отчёты сам", "Те же бланки баланса и ОФР, что на контрольной, с проверкой каждой строки.", "#F4802B", "Задания 18–22")}
       ${toolCard("variants", "Варианты контрольной", `${BK.VARIANTS} готовых вариантов на 22 задания: на время, с проверкой или на бумаге.`, "#F0558C", "Как настоящая")}
       ${toolCard("bank", "Банк заданий", `${BK.total} похожих заданий по каждому типу из контрольной с разбором.`, "#3FB568", "")}
@@ -656,7 +665,7 @@
   }
   function examShell(n) {
     const t = TASKS[n - 1];
-    return `<section class="mesh mesh-magenta wheel-card"><div class="wheel-top"><div class="seg"><a href="#/exam/${n}" class="on">Разбор заданий</a><a href="#/variants">Варианты</a><a href="#/mock">Пробная</a><a href="#/reports">Отчёты</a></div><a class="round" href="#/exam/${n}" data-act="exam-list" aria-label="Все задания">${ICON.grid}</a></div>
+    return `<section class="mesh mesh-magenta wheel-card"><div class="wheel-top"><div class="seg"><a href="#/exam/${n}" class="on"><span class="seg-lg">Разбор заданий</span><span class="seg-sm">Разбор</span></a><a href="#/variants">Варианты</a><a href="#/mock">Пробная</a><a href="#/reports">Отчёты</a><a href="#/mu">Правила</a></div><a class="round" href="#/exam/${n}" data-act="exam-list" aria-label="Все задания">${ICON.grid}</a></div>
       <div class="wheel-title"><span>Задание</span><span id="wheel-n">${n}</span></div><p class="wheel-topic" id="wheel-topic">${esc(t.topic)}</p>
       <div class="wheel" id="wheel" tabindex="0" aria-label="Выбор задания: стрелки влево и вправо"><svg class="arc" aria-hidden="true"></svg>${wheelInner(n)}</div>
       <div class="wheel-bottom"><label class="wheel-note">${ICON.pen}<input id="wheel-note" data-inp="note" data-n="${n}" placeholder="Заметка к заданию" value="${esc(S.notes[n] || "")}" aria-label="Заметка к заданию"></label><button class="pill" data-act="scroll-sol">${ICON.plus}Перейти к решению</button></div></section><div id="exam-body">${examBody(n)}</div>`;
@@ -665,7 +674,7 @@
     const t = TASKS[n - 1], st = S.quiz[`exam.${n}`], ls = LINKS[n] || [], shown = st != null;
     const photoCl = { ok: "ok", bad: "bad", warn: "warn" }[t.photo.verdict] || "", pen = { ok: "✓", bad: "!", warn: "?" }[t.photo.verdict] || "–";
     return `<div class="exam-layout"><div id="exam-main">
-      <div class="paper"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><h2 class="h-sm">Условие</h2><span class="tag">${esc(t.kind)}</span></div>${t.isCase && n !== 18 ? `<details><summary class="small muted" style="cursor:pointer;margin-bottom:10px">Показать данные задачи (общие для заданий 18–22)</summary><div class="blocks">${renderBlocks(t.cond.slice(0, -1))}</div></details><div class="blocks" style="margin-top:10px">${renderBlocks(t.cond.slice(-1))}</div>` : `<div class="blocks">${renderBlocks(t.cond)}</div>`}${t.recog ? `<p class="tiny faint" style="margin-top:12px">${esc(t.recog)}</p>` : ""}</div>
+      <div class="paper"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><h2 class="h-sm">Условие</h2><span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><span class="tag">${esc(t.kind)}</span>${PTS(n) ? `<span class="tag lime">${ptsWord(PTS(n))}</span>` : ""}</span></div>${t.isCase && n !== 18 ? `<details><summary class="small muted" style="cursor:pointer;margin-bottom:10px">Показать данные задачи (общие для заданий 18–22)</summary><div class="blocks">${renderBlocks(t.cond.slice(0, -1))}</div></details><div class="blocks" style="margin-top:10px">${renderBlocks(t.cond.slice(-1))}</div>` : `<div class="blocks">${renderBlocks(t.cond)}</div>`}${t.recog ? `<p class="tiny faint" style="margin-top:12px">${esc(t.recog)}</p>` : ""}</div>
       <div class="check" id="exam-try"><div class="check-head"><span class="ring"></span><h3>Реши сам</h3></div>${quizHTML(`exam.${n}`, t.quiz, { noBadge: false })}</div>
       ${shown ? "" : `<button class="pill ghost" id="sol-btn" data-act="show-sol" style="margin-top:12px">Показать разбор сразу</button>`}
       <section id="sol"${shown ? "" : " hidden"} style="margin-top:26px"><h2 class="h-md" style="margin-bottom:14px">Разбор</h2><div class="steps blocks">${renderBlocks(t.sol)}</div>${vizFor("task", n).length ? `<div style="margin-top:22px;display:flex;flex-direction:column;gap:14px">${vizFor("task", n).slice(0, 2).map(vizBlock).join("")}</div>` : ""}${schemesFor("task", n).length ? `<h3 class="h-sm" style="margin:22px 0 12px">Схема, чтобы запомнить</h3>${schemeStrip(schemesFor("task", n).slice(0, 2))}` : ""}</section>
@@ -695,18 +704,18 @@
     if (a) return mockRun(a);
     const h = S.mock.history;
     return `${crumbs([["", "Главная"], ["exam", "Контрольная"], ["", "Пробная"]])}
-    <section class="mesh mesh-pink" style="padding:34px;margin-bottom:18px"><h1 class="h-xl">Пробная контрольная</h1><p style="margin-top:10px;max-width:56ch;font-size:18px">22 задания без подсказок. Решение и проверка откроются только после сдачи. Калькулятор и черновик держи рядом, как на настоящей.</p></section>
+    <section class="mesh mesh-pink" style="padding:34px;margin-bottom:18px"><h1 class="h-xl">Пробная контрольная</h1><p style="margin-top:10px;max-width:58ch;font-size:18px">22 задания без подсказок: 80 минут и 100 баллов, как в методичке. Решение и проверка откроются только после сдачи. Рядом только кнопочный калькулятор и черновик: больше на контрольной ничего нельзя.</p>${MU ? `<a class="pill" href="#/mu" style="margin-top:16px">Правила и баллы</a>` : ""}</section>
     <div class="mock-modes">
-      <div class="white" style="display:flex;flex-direction:column;gap:12px"><h2 class="h-md">Как на фото</h2><p class="muted small">Те же условия и числа, что на листах контрольной.</p><label class="small muted">Время <select id="mock-min-a" class="sel-time"><option value="60">60 минут</option><option value="90" selected>90 минут</option><option value="120">120 минут</option></select></label><button class="pill ink" data-act="mock-start" data-mode="orig" style="margin-top:auto">Начать</button></div>
-      <div class="white" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;gap:8px;align-items:center"><h2 class="h-md">С новыми числами</h2><span class="tag lime">Честнее</span></div><p class="muted small">Логика та же, числа другие. Так видно, понимаешь ли ты метод, а не помнишь ответы.</p><label class="small muted">Время <select id="mock-min-b" class="sel-time"><option value="60">60 минут</option><option value="90" selected>90 минут</option><option value="120">120 минут</option></select></label><button class="pill ink" data-act="mock-start" data-mode="new" style="margin-top:auto">Начать</button></div>
+      <div class="white" style="display:flex;flex-direction:column;gap:12px"><h2 class="h-md">Как на фото</h2><p class="muted small">Те же условия и числа, что на листах контрольной.</p><label class="small muted">Время <select id="mock-min-a" class="sel-time"><option value="60">60 минут</option><option value="80" selected>80 минут, как на контрольной</option><option value="90">90 минут</option><option value="120">120 минут</option></select></label><button class="pill ink" data-act="mock-start" data-mode="orig" style="margin-top:auto">Начать</button></div>
+      <div class="white" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;gap:8px;align-items:center"><h2 class="h-md">С новыми числами</h2><span class="tag lime">Честнее</span></div><p class="muted small">Логика та же, числа другие. Так видно, понимаешь ли ты метод, а не помнишь ответы.</p><label class="small muted">Время <select id="mock-min-b" class="sel-time"><option value="60">60 минут</option><option value="80" selected>80 минут, как на контрольной</option><option value="90">90 минут</option><option value="120">120 минут</option></select></label><button class="pill ink" data-act="mock-start" data-mode="new" style="margin-top:auto">Начать</button></div>
     </div>
-    ${h.length ? `<div class="sechead"><h2 class="h-md">История</h2></div><div class="white">${[...h].reverse().map((r) => `<div class="history-row"><span>${new Date(r.ts).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}, ${r.mode === "orig" ? "как на фото" : r.mode === "var" ? `вариант ${r.v}` : "новые числа"}</span><b style="font-weight:550">${r.score} из ${r.total}</b></div>`).join("")}</div>` : ""}`;
+    ${h.length ? `<div class="sechead"><h2 class="h-md">История</h2></div><div class="white">${[...h].reverse().map((r) => `<div class="history-row"><span>${new Date(r.ts).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}, ${r.mode === "orig" ? "как на фото" : r.mode === "var" ? `вариант ${r.v}` : "новые числа"}</span><b style="font-weight:550">${recPts(r)} из ${recMax(r)} баллов</b></div>`).join("")}</div>` : ""}`;
   }
   function mockRun(a) {
     const list = mockTasks(a);
     list.forEach((t) => { EPH[`mock.${t.n}`] = t.quiz; });
     return `<div class="sticky-mock"><span class="h-sm">Пробная контрольная</span><span class="dots" id="mock-time" style="font-size:26px">--:--</span><button class="pill ink" data-act="mock-submit">Сдать работу</button></div>
-    ${list.map((t) => `<section style="margin-bottom:18px" id="mq-${t.n}">${t.n === 18 ? `<div class="paper" style="margin-bottom:14px"><h2 class="h-sm" style="margin-bottom:10px">Задания 18–22: общие данные</h2><div class="blocks">${renderBlocks(t.caseCond ? t.cond : EX.tasks[17].cond.slice(0, -1))}</div></div>` : ""}<div class="white" style="border-radius:24px"><h3 class="h-sm" style="margin-bottom:10px">Задание ${t.n}</h3>${t.isCase ? "" : `<div class="blocks" style="margin-bottom:12px">${renderBlocks(t.cond)}</div>`}${quizHTML(`mock.${t.n}`, t.quiz, { mock: true })}</div></section>`).join("")}
+    ${list.map((t) => `<section style="margin-bottom:18px" id="mq-${t.n}">${t.n === 18 ? `<div class="paper" style="margin-bottom:14px"><h2 class="h-sm" style="margin-bottom:10px">Задания 18–22: общие данные</h2><div class="blocks">${renderBlocks(t.caseCond ? t.cond : EX.tasks[17].cond.slice(0, -1))}</div></div>` : ""}<div class="white" style="border-radius:24px"><h3 class="h-sm" style="margin-bottom:10px;display:flex;justify-content:space-between;gap:10px;align-items:center">Задание ${t.n}${PTS(t.n) ? `<span class="tag">${ptsWord(PTS(t.n))}</span>` : ""}</h3>${t.isCase ? "" : `<div class="blocks" style="margin-bottom:12px">${renderBlocks(t.cond)}</div>`}${quizHTML(`mock.${t.n}`, t.quiz, { mock: true })}</div></section>`).join("")}
     <div style="display:flex;justify-content:center;margin:26px 0"><button class="pill ink" data-act="mock-submit">Сдать работу</button></div>`;
   }
   function startMockClock() {
@@ -723,7 +732,7 @@
     const a = S.mock.active; if (!a) return; clearInterval(mockTimer);
     const list = mockTasks(a), res = list.map((t) => ({ n: t.n, ok: evalMockAnswer(t.quiz, a.answers[`mock.${t.n}`]) }));
     const score = res.filter((r) => r.ok).length;
-    const rec = { ts: Date.now(), mode: a.mode, v: a.v, seed: a.seed, score, total: list.length, res, answers: a.answers, used: Math.round((Date.now() - a.start) / 60000) };
+    const rec = { ts: Date.now(), mode: a.mode, v: a.v, seed: a.seed, score, total: list.length, res, answers: a.answers, used: Math.round((Date.now() - a.start) / 60000), minutes: a.minutes };
     S.mock.history.push(rec); S.mock.active = null;
     if (a.mode === "orig") res.forEach((r) => { const q = `exam.${r.n}`, p = S.quiz[q]; if (r.ok || !p || !p.ok) S.quiz[q] = { ok: r.ok, first: p ? p.first : r.ok, tries: (p ? p.tries : 0) + 1, t: Date.now() }; });
     bump(); save();
@@ -732,12 +741,14 @@
   }
   function viewMockResult() {
     const r = S.mock.last || S.mock.history[S.mock.history.length - 1]; if (!r) return viewMock();
-    const list = mockTasks(r), pct = Math.round((r.score / r.total) * 100);
+    const list = mockTasks(r), pts = recPts(r), max = recMax(r), pct = Math.round((pts / max) * 100);
+    const parts = [["Тесты", [1, 2, 3, 4, 5, 6, 9]], ["Расчёт с выбором", [7, 8]], ["Расчёты 10–17", [10, 11, 12, 13, 14, 15, 16, 17]], ["Сквозная задача", [18, 19, 20, 21, 22]]].map(([t, ns]) => { const got = r.res.filter((x) => ns.includes(x.n) && x.ok).reduce((a, x) => a + PTS(x.n), 0), all = r.res.filter((x) => ns.includes(x.n)).reduce((a, x) => a + PTS(x.n), 0); return { t, got, all }; }).filter((x) => x.all);
     const typeOf = (t) => { const k = r.res.find((x) => x.n === t.n); return k && k.ok; };
     return `${crumbs([["", "Главная"], ["exam", "Контрольная"], ["mock", "Пробная"], ["", "Результат"]])}
-    <section class="mesh ${pct >= 70 ? "mesh-green" : pct >= 40 ? "mesh-orange" : "mesh-pink"}" style="padding:34px;margin-bottom:18px;text-align:center"><div style="font-size:17px">Результат</div><div class="dots" style="font-size:96px;margin:18px 0 8px">${r.score}</div><div style="font-size:18px">из ${r.total} заданий, потрачено ${r.used} мин</div></section>
+    <section class="mesh ${pct >= 70 ? "mesh-green" : pct >= 40 ? "mesh-orange" : "mesh-pink"}" style="padding:34px;margin-bottom:18px;text-align:center"><div style="font-size:17px">Результат по баллам методички</div><div class="dots" style="font-size:96px;margin:18px 0 8px">${pts}</div><div style="font-size:18px">из ${max} баллов, это ${grade10(pts, max)} по десятибалльной шкале</div><div class="small" style="margin-top:8px;opacity:.9">Верно ${r.score} из ${r.total} заданий, потрачено ${r.used}${r.minutes ? ` из ${r.minutes}` : ""} мин</div></section>
+    <div class="mu-lost">${parts.map((x) => `<div class="white"><span class="small muted">${x.t}</span><b class="dots">${x.got}<small> / ${x.all}</small></b><span class="tiny ${x.got < x.all ? "bad-t" : "muted"}">${x.got < x.all ? `потеряно ${ptsWord(x.all - x.got)}` : "без потерь"}</span></div>`).join("")}</div>
     <div class="result-grid" style="margin-bottom:22px">${list.map((t) => `<a class="tile ${typeOf(t) ? "ok" : "bad"}" href="${r.mode === "orig" ? `#/exam/${t.n}` : `#/mock/result`}" data-scroll="${r.mode === "orig" ? "" : `rq-${t.n}`}">${t.n}</a>`).join("")}</div>
-    ${list.filter((t) => !typeOf(t)).map((t) => { const ans = r.answers[`mock.${t.n}`]; return `<details class="case-step" id="rq-${t.n}"><summary>Задание ${t.n}. ${esc(t.topic)}</summary><div class="blocks"><div class="fields">${t.quiz.type === "fields" ? t.quiz.fields.map((f, i) => { const v = parseNum(ans && ans[i]), ok = !isNaN(v) && Math.abs(v - f.answer) <= (f.tol || 0) + 1e-9; return `<div class="field" style="grid-template-columns:1fr auto auto"><span>${md(f.label)}</span><span class="${ok ? "" : "faint"}">${ans && ans[i] ? esc(ans[i]) : "нет ответа"}</span><b style="font-weight:550;color:var(--ok)">${fmt(f.answer)}</b></div>`; }).join("") : `<p>Твой ответ: ${ans != null ? md(t.quiz.options[ans]) : "нет ответа"}</p><p><b>Верно:</b> ${md(t.quiz.options[t.quiz.answer])}</p>${optBreakdown(t.quiz, null, ans, true)}`}</div>${r.mode === "orig" ? `<a class="pill" href="#/exam/${t.n}">Открыть разбор задания</a>` : t.isCase ? "" : t.genSol ? renderBlocks(t.genSol) : ""}</div></details>`; }).join("")}
+    ${list.filter((t) => !typeOf(t)).map((t) => { const ans = r.answers[`mock.${t.n}`]; return `<details class="case-step" id="rq-${t.n}"><summary><span>Задание ${t.n}. ${esc(t.topic)}${PTS(t.n) ? ` <span class="tag bad" style="margin-left:6px;vertical-align:2px">−${ptsWord(PTS(t.n))}</span>` : ""}</span></summary><div class="blocks"><div class="fields">${t.quiz.type === "fields" ? t.quiz.fields.map((f, i) => { const v = parseNum(ans && ans[i]), ok = !isNaN(v) && Math.abs(v - f.answer) <= (f.tol || 0) + 1e-9; return `<div class="field" style="grid-template-columns:1fr auto auto"><span>${md(f.label)}</span><span class="${ok ? "" : "faint"}">${ans && ans[i] ? esc(ans[i]) : "нет ответа"}</span><b style="font-weight:550;color:var(--ok)">${fmt(f.answer)}</b></div>`; }).join("") : `<p>Твой ответ: ${ans != null ? md(t.quiz.options[ans]) : "нет ответа"}</p><p><b>Верно:</b> ${md(t.quiz.options[t.quiz.answer])}</p>${optBreakdown(t.quiz, null, ans, true)}`}</div>${r.mode === "orig" ? `<a class="pill" href="#/exam/${t.n}">Открыть разбор задания</a>` : t.isCase ? "" : t.genSol ? renderBlocks(t.genSol) : ""}</div></details>`; }).join("")}
     ${r.mode !== "orig" && list.some((t) => t.n === 18 && t.genSol) ? `<details class="case-step" style="margin-top:12px"><summary>Полное решение сквозной задачи</summary><div class="blocks">${renderBlocks(list.find((t) => t.n === 18).genSol)}</div></details>` : ""}
     <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap"><a class="pill ink" href="#/variants">К вариантам</a><a class="pill" href="#/mock">Пробная</a><a class="pill" href="#/mistakes">Работа над ошибками</a></div>`;
   }
@@ -1072,9 +1083,10 @@
       <a class="mesh mesh-orange hero-mini" href="#/cards"><h2 class="h-md">Карточки</h2><span class="dots" style="font-size:52px">${cards}</span><span class="small">Термины и правила на повторение</span></a>
       <a class="mesh mesh-blue hero-mini" href="#/reports"><h2 class="h-md">Бланки отчётов</h2><span class="dots" style="font-size:52px">3</span><span class="small">Баланс, ОФР и ОДДС с проверкой строк</span></a>
     </div>
-    <div class="tr-grid">${G.LIST.slice(1).map((g) => { const t = S.train[g.id]; return `<a class="tr" href="#/train/${g.id}"><div style="display:flex;justify-content:space-between;align-items:center"><span class="tag lime">Задание ${g.tasks}</span>${t ? `<span class="small muted">${t.ok} из ${t.total}</span>` : ""}</div><h3>${g.title}</h3><p>${g.desc}</p></a>`; }).join("")}<a class="tr" href="#/mistakes"><span class="tag" style="align-self:flex-start">Твои ошибки</span><h3>Работа над ошибками</h3><p>Всё, что решено неверно, пока не исправишь.</p></a></div>`;
+    <div class="tr-grid">${AN && MU ? `<a class="tr" href="#/train/analysis"><div style="display:flex;justify-content:space-between;align-items:center"><span class="tag lime">8 баллов</span>${S.train.analysis ? `<span class="small muted">решено ${S.train.analysis.ok}</span>` : ""}</div><h3>Развёрнутый ответ</h3><p>Анализ отчётности и письменный вывод, как в задании IV типа из методички.</p></a>` : ""}${G.LIST.slice(1).map((g) => { const t = S.train[g.id]; return `<a class="tr" href="#/train/${g.id}"><div style="display:flex;justify-content:space-between;align-items:center"><span class="tag lime">Задание ${g.tasks}</span>${t ? `<span class="small muted">${t.ok} из ${t.total}</span>` : ""}</div><h3>${g.title}</h3><p>${g.desc}</p></a>`; }).join("")}<a class="tr" href="#/mistakes"><span class="tag" style="align-self:flex-start">Твои ошибки</span><h3>Работа над ошибками</h3><p>Всё, что решено неверно, пока не исправишь.</p></a></div>`;
   }
   function viewTrainer(id) {
+    if (id === "analysis" && AN && MU) return viewWritten();
     const g = G.LIST.find((x) => x.id === id); if (!g) return notFound();
     const seed = trainSeeds[id] || (trainSeeds[id] = Math.floor(Math.random() * 1e9) + 1), task = G.run(id, seed), qid = `gen.${id}.${seed}`, t = S.train[id];
     EPH[qid] = Object.assign(task.quiz, { trainId: id });
@@ -1083,6 +1095,153 @@
   }
   const trainSeeds = {};
   function paintTrainStat(id) { const t = S.train[id], a = $("#tr-stat"), b = $("#tr-sub"); if (a && t) { a.textContent = t.ok; b.textContent = `верно из ${t.total}`; } const s = $("#gen-sol"); if (s) s.hidden = false; }
+
+  /* ---------- Правила и баллы по методичке (src/mu.js) ---------- */
+  const muCritBlocks = () => [
+    { t: "table", view: "cards", layout: "grid", head: ["Критерий", "Что проверяют"], rows: MU.criteria.map((c) => [c.h, c.text]) },
+    { t: "table", head: ["Баллы", "Когда ставят"], rows: MU.scale.map((x) => [`**${x.pts}**`, x.text]), align: ["r", "l"] },
+  ];
+  function muState(it) {
+    const ls = (it.ls || []).map((id) => LMAP[id]).filter(Boolean), ex = it.ex || [];
+    const d = ls.filter((l) => lessonState(l) === "done").length + ex.filter((n) => isOk(`exam.${n}`)).length, tot = ls.length + ex.length;
+    if (tot && d === tot) return "done";
+    return d || ls.some((l) => lessonState(l) !== "new") || ex.some((n) => S.quiz[`exam.${n}`]) ? "part" : "new";
+  }
+  function viewMU() {
+    if (!MU) return notFound();
+    const trName = Object.fromEntries([...G.LIST.map((g) => [g.id, g.title]), ["analysis", "Развёрнутый ответ на 8 баллов"]]);
+    const all = MU.topics.flatMap((tp) => [...tp.know, ...(tp.can || [])]), doneAll = all.filter((it) => muState(it) === "done").length;
+    const chip = (href, label, st) => `<a class="mu-chip ${st}" href="#/${href}">${esc(label)}</a>`;
+    const item = (it) => { const st = muState(it); return `<li class="mu-item ${st}"><span class="mu-dot" aria-label="${st === "done" ? "Пройдено" : st === "part" ? "Начато" : "Не начато"}">${st === "done" ? ICON.check : ""}</span><div class="mu-body"><span class="mu-t">${esc(it.t)}</span><span class="mu-chips">${(it.ls || []).map((id) => (LMAP[id] ? chip(`l/${id}`, LMAP[id].title, lessonState(LMAP[id])) : "")).join("")}${(it.ex || []).map((n) => chip(`exam/${n}`, `Задание ${n}`, isOk(`exam.${n}`) ? "done" : S.quiz[`exam.${n}`] ? "part" : "new")).join("")}${it.tr && trName[it.tr] ? chip(`train/${it.tr}`, `Тренажёр: ${trName[it.tr]}`, "tool") : ""}</span></div></li>`; };
+    const topic = (tp) => { const its = [...tp.know, ...(tp.can || [])], d = its.filter((it) => muState(it) === "done").length; return `<section class="white mu-topic" id="mu-${tp.id}"><header><span class="mu-letter">${tp.id}</span><h3 class="h-sm">${esc(tp.title)}</h3><span class="tag ${d === its.length ? "lime" : ""}">${d} из ${its.length}</span></header><div class="mu-sub">Что нужно знать</div><ul class="mu-list">${tp.know.map(item).join("")}</ul>${tp.can ? `<div class="mu-sub">Что нужно уметь</div><ul class="mu-list">${tp.can.map(item).join("")}</ul>` : ""}</section>`; };
+    const types = [
+      { t: "table", head: ["Тип задания", "Баллы", "Что нужно сделать", "На пробной"], rows: MU.types.map((x) => [`${x.n}. ${x.title}`, `**${x.pts}**`, x.text, x.train ? "Заданий на 8 баллов на фото не было, их тренирует отдельный тренажёр" : `Задания ${x.ex}`]), align: ["l", "r", "l", "l"] },
+      { t: "note", kind: "tip", text: "Пробная и варианты на платформе считают баллы так: 7 тестов по 2, задания 7 и 8 по 4, задания 10–22 по 6. Сумма ровно 100, значит, на контрольной с фото, скорее всего, было именно так. Методичка описывает ещё развёрнутые задания на 8 баллов: если они будут в этом году, состав варианта изменится, а навык нужен тот же, что в сквозной задаче." },
+    ];
+    const scoring = [
+      { t: "p", text: "**Задания на 2, 4 и 6 баллов** оценивают только как верные или неверные. Частичных баллов нет: за неверный ответ или его отсутствие 0." },
+      { t: "p", text: "**Задания на 8 баллов** оценивает преподаватель по четырём критериям:" },
+      ...muCritBlocks(),
+      { t: "note", kind: "exam", text: "Из шкалы следует простое правило: в развёрнутом ответе всегда пиши формулу, расчёт и вывод, даже без уверенности в итоговом числе.\n- верно выбранный метод с ошибкой в расчёте даёт 4 из 8, пустой ответ — 0\n- без вывода выше 4 не поставят, даже если все числа верные\n- одна арифметическая ошибка, не повлиявшая на вывод, стоит 2 балла, а не всё задание" },
+    ];
+    const rules = [
+      { t: "list", groups: [{ h: "Можно", items: MU.allowed }, { h: "Нельзя", items: MU.forbidden }] },
+      { t: "note", kind: "trap", text: "При нарушении правил работа оценивается в 0 баллов, пересдача не предусмотрена. Соблюдение правил контролируют прокторы и технические средства наблюдения. Тем, кто пропустил контрольную, назначают дополнительную дату ближе к сессии." },
+    ];
+    const per = String(MU.minutes / MU.maxScore).replace(".", ",");
+    const tactics = [
+      { t: "formula", text: `${MU.minutes} минут / ${MU.maxScore} баллов = ${per} минуты на балл`, note: "Так ориентир по времени привязан к цене задания: дорогое задание заслуживает больше минут." },
+      { t: "table", head: ["Задания", "Баллы", "Ориентир", "На весь блок"], rows: [["Тесты 1–6 и 9", "2", "≈ 1,5 мин", "≈ 10 мин"], ["Расчёт с выбором 7 и 8", "4", "≈ 3 мин", "≈ 6 мин"], ["Расчёты 10–17", "6", "≈ 4,5 мин", "≈ 36 мин"], ["Сквозная задача 18–22", "6 × 5", "≈ 4,5 мин", "≈ 22 мин"], ["Перенос ответов в бланк, проверка", "", "", "5 мин"]], align: ["l", "r", "r", "r"] },
+      { t: "list", items: [
+        "Если задание заняло вдвое больше ориентира, отметь его на полях и переходи дальше: все расчёты по 6 баллов стоят одинаково, застрявшее не стоит двух следующих.",
+        "Перед тем как записать число, проверь единицы (тыс. руб. или руб.), знак (убыток и отток со знаком минус или в скобках) и округление: частичных баллов нет.",
+        "В вопросах с несколькими верными вариантами отмечай все верные: частично верный выбор не засчитывается.",
+        "Черновик не проверяют: оставь последние 5 минут, чтобы перенести все ответы в бланк.",
+        "Шпаргалки и телефон под запретом, поэтому формулы нужно помнить: повтори шпаргалку и карточки накануне. Калькулятор только кнопочный, без памяти: тренируйся на том, с которым пойдёшь.",
+      ] },
+    ];
+    const sec = (h, sub, html, id) => `<div class="sechead"${id ? ` id="${id}"` : ""}><div><h2 class="h-lg">${h}</h2>${sub ? `<p class="muted small" style="margin-top:4px">${sub}</p>` : ""}</div></div>${html}`;
+    return `${crumbs([["", "Главная"], ["exam", "Контрольная"], ["", "Правила и баллы"]])}
+    <section class="mesh mesh-orange" style="padding:34px;margin-bottom:6px"><h1 class="h-xl">Правила и баллы</h1><p style="margin-top:10px;max-width:60ch;font-size:18px">Главное из методических указаний к контрольной: формат, баллы, как оценивают развёрнутый ответ и что можно взять с собой. Внизу чек-лист тем со ссылками на уроки.</p>
+      <div class="mu-stats"><div><span class="dots">${MU.minutes}</span><span>минут, письменно на бумаге</span></div><div><span class="dots">${MU.maxScore}</span><span>баллов: это оценка 10</span></div><div><span class="dots">2·4·6·8</span><span>баллов за задание в зависимости от сложности</span></div><div><span class="dots">0</span><span>баллов за нарушение правил, без пересдачи</span></div></div>
+      <div class="chips" style="margin-top:18px"><a class="chip" href="#/mu" data-scroll="mu-types">Типы заданий</a><a class="chip" href="#/mu" data-scroll="mu-score">Как оценивают</a><a class="chip" href="#/mu" data-scroll="mu-rules">Можно и нельзя</a><a class="chip" href="#/mu" data-scroll="mu-time">Тактика на 80 минут</a><a class="chip" href="#/mu" data-scroll="mu-topics">Чек-лист тем</a></div></section>
+    ${sec("Типы заданий", "Задания распределены по сложности и весят по-разному.", `<div class="blocks">${renderBlocks(types)}</div>`, "mu-types")}
+    ${sec("Как оценивают", "", `<div class="blocks">${renderBlocks(scoring)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">${AN ? `<a class="pill ink" href="#/train/analysis">Тренажёр развёрнутого ответа</a>` : ""}<a class="pill" href="#/exam/18">Сквозная задача 18–22</a></div>`, "mu-score")}
+    ${sec("Что можно и что нельзя", "", `<div class="blocks">${renderBlocks(rules)}</div>`, "mu-rules")}
+    ${sec("Тактика на 80 минут", "Это не из методички, а выводы из её правил.", `<div class="blocks">${renderBlocks(tactics)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px"><a class="pill ink" href="#/mock">Пробная на 80 минут</a><a class="pill" href="#/variants">Варианты</a><a class="pill" href="#/cheat">Шпаргалка</a></div>`, "mu-time")}
+    ${sec("Темы контрольной", `Перечень тем и умений из методички. Пункт отмечается, когда пройдены его уроки и решены задания. Готово ${doneAll} из ${all.length}.`, `<div class="mu-topics">${MU.topics.map(topic).join("")}</div>`, "mu-topics")}
+    <details class="white" style="margin-top:14px"><summary class="small" style="cursor:pointer">Что проверяет контрольная: результаты обучения из методички</summary><ul class="rt-ul" style="margin-top:10px">${MU.outcomes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>`;
+  }
+
+  /* ---------- Развёрнутый ответ на 8 баллов (src/analysis.js) ---------- */
+  const W = { theme: "cash", seed: 0, task: null, text: "", vals: [], res: null, score: null, saved: false };
+  function wTask() {
+    if (!W.seed) W.seed = Math.floor(Math.random() * 1e9) + 1;
+    if (!W.task || W.task.theme.id !== W.theme || W.task.seed !== W.seed) W.task = AN.make(W.theme, W.seed);
+    return W.task;
+  }
+  const wShow = (f) => (f.d ? AN.dec(f.answer, f.d) : fmt(f.answer)) + (f.pct ? " %" : "");
+  const wFieldsHTML = (t) => t.fields.map((f, i) => { const r = W.res && W.res.f[i]; return `<label class="field"><span>${md(f.label)}</span><input class="num${r ? (r.ok ? " right" : " wrong") : ""}" inputmode="text" autocomplete="off" data-winp="${i}" value="${esc(W.vals[i] || "")}"><span class="expect">${r && !r.ok ? esc(wShow(f)) : ""}</span></label>`; }).join("");
+  function viewWritten() {
+    const t = wTask(), st = S.train.analysis;
+    return `${crumbs([["", "Главная"], ["train", "Тренажёры"], ["", "Развёрнутый ответ"]])}
+    <div class="pagehead"><div><h1 class="h-lg" style="font-size:clamp(30px,4vw,46px)">Развёрнутый ответ на 8 баллов</h1><p class="muted" style="margin-top:8px;max-width:64ch">Задание IV типа из методички: разобрать факты хозяйственной жизни, рассчитать показатели и письменно обосновать вывод. Числа проверяются сразу, письменную часть сверяешь с образцом и оцениваешь по шкале преподавателя.</p></div><div style="text-align:right;flex:none"><span class="dots" style="font-size:36px">${st ? st.ok : 0}</span><div class="tiny muted">${st && st.ok ? `решено, последний балл ${st.last} из 8` : "заданий решено"}</div></div></div>
+    <div class="chips" style="margin-bottom:14px" role="group" aria-label="Тема анализа">${AN.THEMES.map((th) => `<button class="chip ${th.id === W.theme ? "on" : ""}" data-act="w-theme" data-th="${th.id}" aria-pressed="${th.id === W.theme}">${esc(th.title)}</button>`).join("")}</div>
+    <details class="white w-crit"><summary>Как оценивает преподаватель: четыре критерия и шкала 0, 4, 6, 8</summary><div class="blocks" style="margin-top:14px">${renderBlocks(muCritBlocks())}</div></details>
+    <div class="w-wrap">
+      <div class="paper"><div class="blocks">${renderBlocks(t.cond)}</div>
+        <div class="w-q"><b>Задание.</b> ${md(t.q)}</div><p class="small muted" style="margin-top:8px">${md(t.rules)}</p>
+        <details class="w-stm"><summary>Отчёты уже собраны: открыть, чтобы сосредоточиться на анализе</summary><div class="blocks" style="margin-top:12px">${renderBlocks(t.statements)}</div></details></div>
+      <div class="check w-box">
+        <h3 class="h-sm">Расчёты</h3><div class="fields" id="w-fields">${wFieldsHTML(t)}</div>
+        <h3 class="h-sm" style="margin-top:14px">Письменный ответ</h3><p class="small muted" style="margin-top:-6px">Как на бумаге: формула и расчёт, что повлияло, вывод, рекомендация. Только термины учёта.</p>
+        <textarea id="w-text" class="open-in" rows="10" placeholder="Расчёт… Что повлияло… Вывод… Рекомендация…" aria-label="Письменный ответ">${esc(W.text)}</textarea>
+        <div class="qz-actions"><button class="pill ink" data-act="w-check">Проверить и сравнить с образцом</button><button class="pill ghost" data-act="w-template">Вставить план ответа</button></div>
+        <div id="w-res">${W.res ? wResultHTML(t) : ""}</div>
+      </div>
+      <div class="gen-actions"><button class="pill" data-act="w-new">Новое задание</button></div>
+    </div>`;
+  }
+  function wResultHTML(t) {
+    const r = W.res, okN = r.f.filter((x) => x.ok).length, tc = r.tc, miss = tc.hits.filter((h) => !h.ok);
+    const row = (ok, text) => `<li class="${ok ? "ok" : "bad"}"><i aria-hidden="true">${ok ? ICON.check : "!"}</i><span>${text}</span></li>`;
+    const checks = [
+      row(okN === t.fields.length, `Расчёты: верно ${okN} из ${t.fields.length}${okN < t.fields.length ? ". Верные значения стоят рядом с полями." : "."}`),
+      row(tc.nums >= 3, tc.nums >= 3 ? `Вывод опирается на расчёты: в тексте ${tc.nums} ${plural(tc.nums, "число", "числа", "чисел")}.` : "В тексте почти нет чисел, а вывод должен опираться на расчёты."),
+      row(!miss.length, miss.length ? `Не хватает ключевых связей: ${esc(miss.map((h) => h.l).join("; "))}.` : "Ключевые связи названы."),
+      row(!tc.lex.length, tc.lex.length ? `Бытовые слова: ${tc.lex.map((x) => `«${esc(x.bad)}» → ${esc(x.good)}`).join("; ")}.` : "Бытовых слов не нашлось."),
+      row(tc.concl && tc.reco, tc.concl && tc.reco ? "Есть вывод и рекомендация." : !tc.concl ? "Не нашлось явного вывода: начни его со слова «Вывод», так проверяющему проще его найти." : "Нет рекомендации: что компании стоит сделать по итогам расчётов."),
+    ];
+    return `<div class="w-res">
+      <ul class="w-checks">${checks.join("")}</ul>
+      <p class="w-sug">Предварительная оценка: <b>${r.sug} из 8</b>. ${esc(r.why)}</p>
+      <h3 class="h-md" style="margin:22px 0 12px">Образец ответа</h3><div class="blocks">${renderBlocks(t.model)}</div>
+      <h3 class="h-sm" style="margin:24px 0 6px">Какой балл поставят за такой ответ?</h3><p class="small muted" style="margin-bottom:10px">Сравни свой текст с образцом и выбери балл по шкале методички.</p>
+      <div class="w-scale" role="radiogroup" aria-label="Оценка по шкале методички">${MU.scale.map((x) => `<button class="w-sc ${W.score === x.pts ? "on" : ""}" data-act="w-score" data-p="${x.pts}" role="radio" aria-checked="${W.score === x.pts}"><b>${x.pts}</b><span>${esc(x.text)}</span></button>`).join("")}</div>
+      ${W.saved ? `<p class="small" style="margin-top:12px">Записано: ${W.score} из 8. Дальше новое задание или другая тема.</p>` : ""}
+    </div>`;
+  }
+  function wAct(act, el) {
+    if (!AN || !MU) return;
+    if (act === "w-theme" || act === "w-new") {
+      if (act === "w-theme") W.theme = el.dataset.th;
+      Object.assign(W, { seed: Math.floor(Math.random() * 1e9) + 1, task: null, text: "", vals: [], res: null, score: null, saved: false });
+      route(); return;
+    }
+    if (act === "w-template") {
+      const ta = $("#w-text"); if (!ta) return;
+      if (!ta.value.trim()) { ta.value = "Расчёт:\n\nЧто повлияло:\n\nВывод:\n\nРекомендация:\n"; W.text = ta.value; }
+      ta.focus(); ta.setSelectionRange(9, 9); return;
+    }
+    const t = wTask(), box = $("#w-res");
+    if (act === "w-check") {
+      W.text = ($("#w-text") || { value: W.text }).value;
+      $$("[data-winp]").forEach((inp) => { W.vals[+inp.dataset.winp] = inp.value; });
+      const f = t.fields.map((fd, i) => { const v = parseNum(String(W.vals[i] || "").replace(/%/g, "")); return { ok: !isNaN(v) && Math.abs(v - fd.answer) <= (fd.tol || 0) + 1e-9 }; });
+      const tc = AN.textCheck(W.text, t.kw), wrong = f.filter((x) => !x.ok).length, why = [];
+      let sug = 8;
+      if (tc.words < 15) { sug = wrong === f.length ? 0 : 4; why.push("Письменного обоснования почти нет, а без формулировки решения выше 4 не ставят."); }
+      if (wrong >= 2) { sug = Math.min(sug, 4); why.push("Ошибки в нескольких расчётах считаются существенными."); }
+      else if (wrong === 1) { sug = Math.min(sug, 6); why.push("Одна ошибка в расчёте даёт 6, только если она не повлияла на вывод."); }
+      if (tc.words >= 15) {
+        if (!tc.concl && !tc.reco) { sug = Math.min(sug, 4); why.push("Явного вывода не видно, а без него ставят 4."); }
+        else if (!tc.concl || !tc.reco || tc.nums < 3 || tc.lex.length || tc.hits.filter((h) => !h.ok).length > 1) { sug = Math.min(sug, 6); why.push("Есть недочёты в выводе, аргументации или терминах."); }
+      }
+      if (!why.length) why.push("Расчёты верны, в тексте есть числа, ключевые связи, вывод и рекомендация. Сверь с образцом, всё ли учтено.");
+      W.res = { f, tc, sug, why: why.join(" ") }; W.score = null; W.saved = false;
+      const fl = $("#w-fields"); if (fl) fl.innerHTML = wFieldsHTML(t);
+      if (box) { box.innerHTML = wResultHTML(t); box.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      return;
+    }
+    if (act === "w-score") {
+      const p = +el.dataset.p, rec = (S.train.analysis = S.train.analysis || { ok: 0, total: 0, sum: 0, last: 0 });
+      if (!W.saved) { rec.ok++; rec.total++; rec.sum = (rec.sum || 0) + p; }
+      else rec.sum = (rec.sum || 0) - (W.score || 0) + p;
+      rec.last = p; W.score = p; W.saved = true; save();
+      if (box) box.innerHTML = wResultHTML(t);
+      dpBarRefresh();
+    }
+  }
 
   /* ---------- Карточки ---------- */
   let cardSess = null;
@@ -1227,12 +1386,12 @@
   const bankCard = (qid, x, title) => `<article class="paper bank-card" id="${esc(qid)}"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 class="h-sm">${esc(title)}</h2>${isOk(qid) ? `<span class="tag lime">Решено</span>` : isTried(qid) ? `<span class="tag bad">Была ошибка</span>` : ""}</div><div class="blocks">${renderBlocks(x.cond)}</div><div style="margin-top:12px">${quizHTML(qid, x.quiz, { noBadge: true })}</div>${x.sol && x.sol.length ? `<details class="case-step" style="margin:12px 0 0"><summary>Показать разбор</summary><div class="blocks">${renderBlocks(x.sol)}</div></details>` : ""}</article>`;
 
   /* ---------- Варианты контрольной ---------- */
-  const varBest = (id) => { const h = S.mock.history.filter((r) => r.mode === "var" && r.v === id); return h.length ? Math.max(...h.map((r) => r.score)) : null; };
+  const varBest = (id) => { const h = S.mock.history.filter((r) => r.mode === "var" && r.v === id); return h.length ? Math.max(...h.map(recPts)) : null; };
   const varSolved = (id) => BK.variants[id - 1].tasks.filter((t) => isOk(`var.${id}.${t.n}`)).length;
   function viewVariants() {
     const mesh = ["mesh-magenta", "mesh-orange", "mesh-green", "mesh-blue", "mesh-pink", "mesh-magenta"];
     return `${crumbs([["", "Главная"], ["exam", "Контрольная"], ["", "Варианты"]])}<div class="pagehead"><div><h1 class="h-xl">Варианты контрольной</h1><p class="muted" style="margin-top:10px;max-width:62ch">Каждый вариант повторяет структуру настоящей контрольной: 22 задания в том же порядке, задания 18–22 это одна сквозная задача. Ситуации и числа свои.</p></div></div>
-    <div class="var-grid">${BK.variants.map((v, i) => { const best = varBest(v.id), sv = varSolved(v.id); return `<a class="mesh ${mesh[i]} var-card" href="#/v/${v.id}"><div style="display:flex;justify-content:space-between;gap:10px"><span class="h-md">${esc(v.title)}</span>${best != null ? `<span class="tag lime">Лучший ${best} из 22</span>` : ""}</div><span class="dots" style="font-size:72px">${v.id}</span><span class="small">Сквозная задача: ООО «${esc(v.company)}»${sv ? `. С проверкой решено ${sv} из 22` : ""}</span></a>`; }).join("")}</div>
+    <div class="var-grid">${BK.variants.map((v, i) => { const best = varBest(v.id), sv = varSolved(v.id); return `<a class="mesh ${mesh[i]} var-card" href="#/v/${v.id}"><div style="display:flex;justify-content:space-between;gap:10px"><span class="h-md">${esc(v.title)}</span>${best != null ? `<span class="tag lime">Лучший результат ${best} из 100</span>` : ""}</div><span class="dots" style="font-size:72px">${v.id}</span><span class="small">Сквозная задача: ООО «${esc(v.company)}»${sv ? `. С проверкой решено ${sv} из 22` : ""}</span></a>`; }).join("")}</div>
     <div class="sechead"><h2 class="h-md">Ещё</h2></div><div class="tr-grid"><a class="tr" href="#/mock"><h3>Пробная по фото или со случайными числами</h3><p>Условия как на листах контрольной или новый набор чисел при каждом запуске.</p></a><a class="tr" href="#/bank"><h3>Банк заданий</h3><p>Если какой-то тип заданий не идёт, потренируй его отдельно.</p></a></div>`;
   }
   function viewVariant(id) {
@@ -1240,11 +1399,11 @@
     return `${crumbs([["", "Главная"], ["exam", "Контрольная"], ["variants", "Варианты"], ["", v.title]])}
     <div class="pagehead"><div><h1 class="h-xl">${esc(v.title)}</h1><p class="muted" style="margin-top:10px">22 задания. Сквозная задача: ООО «${esc(v.company)}».</p></div></div>
     <div class="mock-modes" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
-      <div class="white" style="display:flex;flex-direction:column;gap:10px"><h2 class="h-md">На время</h2><p class="muted small">Как на настоящей: без подсказок, проверка после сдачи.</p><label class="small muted">Время <select id="var-min" class="sel-time"><option value="60">60 минут</option><option value="90" selected>90 минут</option><option value="120">120 минут</option></select></label><button class="pill ink" data-act="var-start" data-v="${id}" style="margin-top:auto">Начать</button></div>
+      <div class="white" style="display:flex;flex-direction:column;gap:10px"><h2 class="h-md">На время</h2><p class="muted small">Как на настоящей: без подсказок, проверка после сдачи.</p><label class="small muted">Время <select id="var-min" class="sel-time"><option value="60">60 минут</option><option value="80" selected>80 минут, как на контрольной</option><option value="90">90 минут</option><option value="120">120 минут</option></select></label><button class="pill ink" data-act="var-start" data-v="${id}" style="margin-top:auto">Начать</button></div>
       <div class="white" style="display:flex;flex-direction:column;gap:10px"><h2 class="h-md">С проверкой</h2><p class="muted small">Проверяешь каждое задание сразу и смотришь разбор. Ошибки попадут в работу над ошибками.</p><a class="pill ink" href="#/v/${id}/study" style="margin-top:auto">Решать</a></div>
       <div class="white" style="display:flex;flex-direction:column;gap:10px"><h2 class="h-md">На бумаге</h2><p class="muted small">Распечатай вариант и реши от руки, как на контрольной. Ключ можно напечатать отдельно.</p><a class="pill ink" href="#/v/${id}/print" style="margin-top:auto">К печати</a></div>
     </div>
-    ${h.length ? `<div class="sechead"><h2 class="h-md">Твои попытки</h2></div><div class="white">${[...h].reverse().map((r) => `<div class="history-row"><span>${new Date(r.ts).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}, ${r.used} мин</span><b style="font-weight:550">${r.score} из ${r.total}</b></div>`).join("")}</div>` : ""}`;
+    ${h.length ? `<div class="sechead"><h2 class="h-md">Твои попытки</h2></div><div class="white">${[...h].reverse().map((r) => `<div class="history-row"><span>${new Date(r.ts).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}, ${r.used} мин</span><b style="font-weight:550">${recPts(r)} из ${recMax(r)} баллов</b></div>`).join("")}</div>` : ""}`;
   }
   function viewVariantStudy(id) {
     const v = BK.variants[id - 1]; if (!v) return notFound(); const c = v.tasks.find((t) => t.n === 18);
@@ -1322,6 +1481,7 @@
     else if (r === "notes") html = viewNotes();
     else if (r === "account") html = viewAccount();
     else if (r === "bank") html = a === "open" ? (OPENQ.length ? viewOpenBank() : viewBank()) : a ? viewBankType(+a) : viewBank();
+    else if (r === "mu") html = viewMU();
     else if (r === "variants") html = viewVariants();
     else if (r === "v") html = parts[2] === "study" ? viewVariantStudy(+a) : parts[2] === "print" ? viewVariantPrint(+a) : viewVariant(+a);
     else if (r === "schemes") { const gs = [...new Set(SCHEMES.map((x) => x.group))]; html = viewSchemes(a != null && a !== "" ? gs[+a] : null); }
@@ -1427,6 +1587,7 @@
     else if (act === "show-sol") { $("#sol").hidden = false; unlockPhoto(); ac.remove(); $("#sol").scrollIntoView({ behavior: "smooth" }); }
     else if (act === "mock-start") { const mode = ac.dataset.mode, min = +($(mode === "orig" ? "#mock-min-a" : "#mock-min-b").value); S.mock.active = { start: Date.now(), minutes: min, mode, seed: Math.floor(Math.random() * 1e9) + 1, answers: {} }; save(); route(); }
     else if (act === "mock-submit") { submitMock(false); }
+    else if (act && act.startsWith("w-")) wAct(act, ac);
     else if (act && act.startsWith("rp-")) rpAct(act, ac);
     else if (act === "var-start") { const v = +ac.dataset.v, min = +($("#var-min").value); S.mock.active = { start: Date.now(), minutes: min, mode: "var", v, seed: v, answers: {} }; save(); location.hash = "#/mock"; }
     else if (act === "zoom") { openZoom(ac.dataset.id); }
@@ -1468,6 +1629,8 @@
   document.addEventListener("input", (e) => {
     const t = e.target;
     if (t.id === "search-in") { runSearch(t.value); return; }
+    if (t.id === "w-text") { W.text = t.value; return; }
+    if (t.dataset.winp != null) { W.vals[+t.dataset.winp] = t.value; return; }
     if (t.dataset.inp === "note") { S.notes[t.dataset.n] = t.value; save(); return; }
     if (t.dataset.cell) { const k = window.__formsKey; S.forms[k] = S.forms[k] || {}; S.forms[k][t.dataset.cell] = t.value; save(); return; }
     const qz = t.closest && t.closest(".qz"); if (qz && qz.dataset.mock && t.dataset.f != null) { const a = S.mock.active, q = qz.dataset.q; a.answers[q] = a.answers[q] || {}; a.answers[q][t.dataset.f] = t.value; save(); }

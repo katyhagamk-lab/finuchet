@@ -62,5 +62,25 @@ BC.CASES.forEach((c) => {
   eq(s.end.total, s.end.vna + s.end.oa, w + " валюта");
 });
 BK.variants.forEach((v) => { const need = Object.keys(tests).length ? 22 : 15; eq(v.tasks.length, need, v.title + " число заданий"); if (need === 22) eq(v.tasks.map((t) => t.n).join(), Array.from({ length: 22 }, (_, i) => i + 1).join(), v.title + " порядок"); });
+// Методичка: баллы, ссылки чек-листа, план по дням
+vm.runInContext(fs.readFileSync(path.join(here, "mu.js"), "utf8"), ctx);
+vm.runInContext(fs.readFileSync(path.join(here, "analysis.js"), "utf8"), ctx);
+vm.runInContext(fs.readFileSync(path.join(here, "dayplan.js"), "utf8"), ctx);
+const MU = ctx.window.MU, AN = ctx.window.ANALYSIS, DPL = ctx.window.DAYPLAN;
+const lessonIds = new Set(); for (const m of fs.readdirSync(path.join(here, "content")).filter((x) => /^m\d+$/.test(x))) for (const f of fs.readdirSync(path.join(here, "content", m)).filter((x) => /^l\d+\.json$/.test(x))) lessonIds.add(JSON.parse(fs.readFileSync(path.join(here, "content", m, f), "utf8")).id);
+eq(Object.values(MU.points).reduce((x, y) => x + y, 0), 100, "сумма баллов 22 заданий");
+eq(Object.keys(MU.points).length, 22, "баллы у всех 22 заданий");
+const trIds = new Set([...G.LIST.map((g) => g.id), "analysis"]);
+MU.topics.forEach((tp) => [...tp.know, ...(tp.can || [])].forEach((it) => { (it.ls || []).forEach((id) => eq(lessonIds.has(id), true, `методичка ${tp.id}: урок ${id}`)); (it.ex || []).forEach((n) => eq(n >= 1 && n <= 22, true, `методичка ${tp.id}: задание ${n}`)); if (it.tr) eq(trIds.has(it.tr), true, `методичка ${tp.id}: тренажёр ${it.tr}`); }));
+DPL.days.forEach((d) => d.items.forEach((it) => { if (it.t === "lesson") eq(lessonIds.has(it.id), true, `план ${d.date}: урок ${it.id}`); if (it.t === "train") eq(trIds.has(it.id), true, `план ${d.date}: тренажёр ${it.id}`); }));
+// Развёрнутый ответ: 4 темы × 500 задач, мост «прибыль → сальдо текущих» сходится, ответы числовые
+for (let i = 1; i <= 500; i++) for (const th of AN.THEMES) {
+  const t = AN.make(th.id, i * 104729 + 7), txt = JSON.stringify([t.model, t.fields, t.q, t.rules]);
+  if (/NaN|undefined|Infinity/.test(txt)) { fail++; console.log("мусор в развёрнутом ответе", th.id, i); } else pass++;
+  t.fields.forEach((f) => { if (!Number.isFinite(f.answer)) { fail++; console.log("нечисловой ответ", th.id, i, f.label); } });
+  if (th.id === "cash") eq(t.s.net + AN.bridge(t.s).reduce((x, b) => x + b.v, 0), t.s.td, `мост прибыль → деньги ${i}`);
+}
+const tcx = AN.textCheck("Вывод: дебиторская задолженность выросла на 15 500, деньги на счёте уменьшились до 16 800. Рекомендация: сократить отсрочку.", [{ l: "дебиторка", s: ["дебитор"] }]);
+eq(tcx.hits[0].ok && tcx.concl && tcx.reco && tcx.nums >= 2 && tcx.lex.length === 1, true, "проверка письменного ответа");
 console.log(`Банк: ${BK.total}. Варианты: ${BK.variants.length}.`);
 console.log(`Запусков генераторов: ${runs}. Проверок пройдено: ${pass}. Ошибок: ${fail}.`); process.exit(fail ? 1 : 0);

@@ -989,3 +989,66 @@ td .rt-ul{gap:3px}
   .dpb-steps{margin-left:-14px;margin-right:-12px;padding-left:14px;padding-right:12px}
   .bottombar a{padding:10px 5px;font-size:11.5px}
 }
+
+/* Правила и баллы по методичке */
+.mu-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:22px}
+.mu-stats>div{background:rgba(255,255,255,.7);color:var(--ink);border-radius:20px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;font-size:14.5px;line-height:1.3}
+.mu-stats .dots{font-size:34px;line-height:1;white-space:nowrap}
+.mu-topics{display:flex;flex-direction:column;gap:12px}
+.mu-topic header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.mu-topic header .h-sm{flex:1;min-width:0}
+.mu-letter{flex:none;width:34px;height:34px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:550}
+.mu-sub{font-size:13px;color:var(--ink-2);margin:12px 0 4px}
+.mu-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.mu-item{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.mu-item:first-child{border-top:0}
+.mu-dot{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink-3);display:grid;place-items:center;margin-top:1px}
+.mu-dot svg{width:13px;height:13px}
+.mu-item.part .mu-dot{border-color:var(--orange);background:linear-gradient(90deg,var(--orange) 50%,transparent 50%)}
+.mu-item.done .mu-dot{border-color:var(--ok);background:var(--ok);color:#fff}
+.mu-body{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:15.5px;line-height:1.4}
+.mu-chips{display:flex;flex-wrap:wrap;gap:5px}
+.mu-chip{font-size:13px;line-height:1.25;padding:4px 10px;border-radius:999px;background:var(--card);color:var(--ink-2)}
+.mu-chip:hover{background:var(--card-2);color:var(--ink)}
+.mu-chip.done{background:var(--ok-soft);color:var(--ok)}
+.mu-chip.part{background:#FDEBDC;color:#A84F12}
+.mu-chip.tool{background:var(--lime-soft);color:var(--ink)}
+.mu-lost{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.mu-lost .white{display:flex;flex-direction:column;gap:6px;padding:16px 18px}
+.mu-lost .dots{font-size:36px;line-height:1}
+.mu-lost .dots small{font-size:20px;color:var(--ink-3)}
+.bad-t{color:var(--bad)}
+
+/* Развёрнутый ответ на 8 баллов */
+.w-wrap{max-width:900px;margin-top:14px}
+.w-crit{max-width:900px}
+.w-crit summary,.w-stm summary{cursor:pointer;font-size:15.5px}
+.w-stm{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.w-q{margin-top:18px;padding:14px 16px;background:var(--lime-soft);border-radius:16px;font-size:16px;line-height:1.45}
+.w-q b{font-weight:600}
+.w-box{gap:14px}
+.w-box .open-in{min-height:220px}
+.w-checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.w-checks li{display:flex;gap:10px;align-items:flex-start;font-size:15.5px;line-height:1.4}
+.w-checks i{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:13px;font-weight:600}
+.w-checks li.ok i{background:var(--ok-soft);color:var(--ok)}
+.w-checks li.bad i{background:var(--bad-soft);color:var(--bad)}
+.w-checks svg{width:12px;height:12px}
+.w-sug{margin-top:14px;padding:12px 14px;border-radius:14px;background:#fff;font-size:15.5px;line-height:1.45}
+.w-scale{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.w-sc{display:flex;gap:12px;align-items:flex-start;text-align:left;background:#fff;border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.38;color:var(--ink-2);border:1.5px solid transparent}
+.w-sc b{flex:none;font-size:24px;font-weight:600;line-height:1;color:var(--ink);min-width:22px;letter-spacing:-.02em}
+.w-sc:hover{border-color:var(--line)}
+.w-sc.on{border-color:var(--ink);color:var(--ink)}
+@media (max-width:640px){
+  .mu-stats,.mu-lost{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .w-scale{grid-template-columns:minmax(0,1fr)}
+  .mu-stats .dots{font-size:28px}
+}
+.seg-sm{display:none}
+@media (max-width:640px){
+  .wheel-top .seg{overflow-x:auto;scrollbar-width:none;justify-content:flex-start}
+  .wheel-top .seg::-webkit-scrollbar{display:none}
+  .wheel-top .seg a{flex:0 0 auto;padding:10px 10px}
+  .seg-lg{display:none}.seg-sm{display:inline}
+}
