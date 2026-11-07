@@ -252,7 +252,7 @@
       const order = item.keep ? item.options.map((v, i) => ({ v, i })) : seeded(item.options, qid);
       const multi = item.type === "multi";
       const ans = mock ? S.mock.active && S.mock.active.answers[qid] : null;
-      body = `<div class="opts">${order.map(({ v, i }) => { let cl = multi ? "opt square" : "opt"; if (solved && (multi ? item.answer.includes(i) : item.answer === i)) cl += " right"; if (mock && ans === i) cl += " sel"; return `<button class="${cl}" data-act="opt" data-i="${i}"${solved ? ' aria-disabled="true"' : ""}><i></i><span>${md(v)}</span></button>`; }).join("")}</div>`;
+      body = `<div class="opts">${order.map(({ v, i }, k) => { let cl = multi ? "opt square" : "opt"; if (solved && (multi ? item.answer.includes(i) : item.answer === i)) cl += " right"; if (mock && ans === i) cl += " sel"; return `<button class="${cl}" data-act="opt" data-i="${i}"${solved ? ' aria-disabled="true"' : ""}><i></i><span>${letOpt(v, k)}</span></button>`; }).join("")}</div>`;
       if (multi && !solved && !mock) body += `<div class="qz-actions"><button class="pill ink" data-act="check">Проверить</button></div>`;
     } else if (item.type === "tf") {
       body = `<div class="opts" style="flex-direction:row;gap:8px">${[["Верно", true], ["Неверно", false]].map(([t, v]) => `<button class="opt${solved && item.answer === v ? " right" : ""}" style="flex:1" data-act="tf" data-v="${v}"${solved ? ' aria-disabled="true"' : ""}><i></i><span>${t}</span></button>`).join("")}</div>`;
@@ -270,7 +270,7 @@
       body = `<div class="sort-list">${order.map(({ v, i }) => `<div class="sort-item${solved ? " right" : ""}" data-i="${i}"><span>${md(v.text)}</span><div class="sort-b">${item.buckets.map((b, bi) => `<button data-act="pick" data-b="${bi}" class="${solved && v.b === bi ? "on" : ""}"${solved ? ' aria-disabled="true"' : ""}>${esc(b)}</button>`).join("")}</div></div>`).join("")}</div><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button>`}</div>`;
     }
     const fb = solved && !o.hideWhy ? `<div class="fb ok"><b>${item.type === "open" ? "Засчитано" : "Верно"}</b>${item.type === "open" ? `<div class="model"><b>Образцовый ответ</b>${md(item.model)}</div>` : md(item.why)}</div>${(item.type === "choice" || item.type === "multi") ? optBreakdown(item, (item.keep ? item.options.map((v, i) => ({ v, i })) : seeded(item.options, qid)).map((x) => x.i), null, false) : ""}${["choice", "multi", "tf", "sort"].includes(item.type) ? `<p class="qtip-hint tiny muted"><span class="h-hover">Наведи курсор на вариант, чтобы увидеть, почему он верный или неверный.</span><span class="h-touch">Нажми на вариант, чтобы увидеть, почему он верный или неверный.</span></p>` : ""}<div class="qz-actions"><button class="pill ghost" data-act="redo">Решить заново</button></div>` : "";
-    return `<div class="qz" data-q="${esc(qid)}"${mock ? ' data-mock="1"' : ""}>${badge}${o.noQ ? "" : `<p class="q">${md(item.q)}</p>`}${body}<div class="fb-slot">${fb}</div></div>`;
+    return `<div class="qz" data-q="${esc(qid)}"${mock ? ' data-mock="1"' : ""}>${badge}${o.noQ ? "" : `<p class="q">${md(item.q)}</p>`}${item.type === "multi" && !solved && !/все верн|несколько/i.test(item.q || "") ? `<p class="tiny muted" style="margin:-4px 0 8px">Верных вариантов несколько. Как на контрольной, засчитывается, только если отмечены все верные.</p>` : ""}${body}<div class="fb-slot">${fb}</div></div>`;
   }
   function record(qid, ok) {
     if (EPH[qid]) { const id = EPH[qid].trainId; if (id) { const t = (S.train[id] = S.train[id] || { ok: 0, total: 0 }); if (!EPH[qid].counted) { t.total++; if (ok) t.ok++; EPH[qid].counted = true; } save(); paintTrainStat(id); } return; }
@@ -280,10 +280,13 @@
     const bs = $("#bank-stat"); if (bs && qid.startsWith("bank.")) { const n = qid.split(".")[1]; bs.textContent = `Решено ${bankDone(n)} из ${BK.bank[n].length}`; }
   }
   /* Разбор каждого варианта: открыт после ошибки, свёрнут после верного ответа */
+  /* Буквы вариантов как на листах контрольной: а), б), в)… Если буква уже есть в тексте, вторую не ставим */
+  const LETS = "абвгдежзик";
+  const letOpt = (v, k) => (/^\s*[а-кa-k]\)\s/.test(String(v)) ? md(v) : `${LETS[k] || k + 1}) ${md(v)}`);
   function optBreakdown(item, order, chosen, open) {
     if (!Array.isArray(item.ow) || !Array.isArray(item.options) || item.ow.length !== item.options.length) return "";
     const right = new Set(Array.isArray(item.answer) ? item.answer : [item.answer]), pick = new Set(chosen == null ? [] : Array.isArray(chosen) ? chosen : [chosen]);
-    const rows = (order && order.length ? order : item.options.map((_, i) => i)).map((i) => `<li class="ob ${right.has(i) ? "ok" : "no"}${pick.has(i) ? " me" : ""}"><span class="ob-m" aria-hidden="true">${right.has(i) ? ICON.check : ICON.x}</span><div><p class="ob-o"><span class="vh">${right.has(i) ? "Верный вариант: " : "Неверный вариант: "}</span>${md(item.options[i])}${pick.has(i) ? ` <span class="tag ${right.has(i) ? "ok" : "bad"}">твой ответ</span>` : ""}</p><p class="ob-w">${md(item.ow[i])}</p></div></li>`).join("");
+    const rows = (order && order.length ? order : item.options.map((_, i) => i)).map((i, k) => `<li class="ob ${right.has(i) ? "ok" : "no"}${pick.has(i) ? " me" : ""}"><span class="ob-m" aria-hidden="true">${right.has(i) ? ICON.check : ICON.x}</span><div><p class="ob-o"><span class="vh">${right.has(i) ? "Верный вариант: " : "Неверный вариант: "}</span>${letOpt(item.options[i], k)}${pick.has(i) ? ` <span class="tag ${right.has(i) ? "ok" : "bad"}">твой ответ</span>` : ""}</p><p class="ob-w">${md(item.ow[i])}</p></div></li>`).join("");
     return `<details class="ob-box"${open ? " open" : ""}><summary>Разбор всех вариантов</summary><ul class="ob-list">${rows}</ul></details>`;
   }
   function feedback(el, ok, item, extra, chosen) {
