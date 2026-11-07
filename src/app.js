@@ -213,10 +213,10 @@
       const order = item.keep ? item.options.map((v, i) => ({ v, i })) : seeded(item.options, qid);
       const multi = item.type === "multi";
       const ans = mock ? S.mock.active && S.mock.active.answers[qid] : null;
-      body = `<div class="opts">${order.map(({ v, i }) => { let cl = multi ? "opt square" : "opt"; if (solved && (multi ? item.answer.includes(i) : item.answer === i)) cl += " right"; if (mock && ans === i) cl += " sel"; return `<button class="${cl}" data-act="opt" data-i="${i}"${solved ? " disabled" : ""}><i></i><span>${md(v)}</span></button>`; }).join("")}</div>`;
+      body = `<div class="opts">${order.map(({ v, i }) => { let cl = multi ? "opt square" : "opt"; if (solved && (multi ? item.answer.includes(i) : item.answer === i)) cl += " right"; if (mock && ans === i) cl += " sel"; return `<button class="${cl}" data-act="opt" data-i="${i}"${solved ? ' aria-disabled="true"' : ""}><i></i><span>${md(v)}</span></button>`; }).join("")}</div>`;
       if (multi && !solved && !mock) body += `<div class="qz-actions"><button class="pill ink" data-act="check">Проверить</button></div>`;
     } else if (item.type === "tf") {
-      body = `<div class="opts" style="flex-direction:row;gap:8px">${[["Верно", true], ["Неверно", false]].map(([t, v]) => `<button class="opt${solved && item.answer === v ? " right" : ""}" style="flex:1" data-act="tf" data-v="${v}"${solved ? " disabled" : ""}><i></i><span>${t}</span></button>`).join("")}</div>`;
+      body = `<div class="opts" style="flex-direction:row;gap:8px">${[["Верно", true], ["Неверно", false]].map(([t, v]) => `<button class="opt${solved && item.answer === v ? " right" : ""}" style="flex:1" data-act="tf" data-v="${v}"${solved ? ' aria-disabled="true"' : ""}><i></i><span>${t}</span></button>`).join("")}</div>`;
     } else if (item.type === "number") {
       const v = solved ? fmt(item.answer) : "";
       body = `<div class="num-row"><input class="num${solved ? " right" : ""}" inputmode="decimal" autocomplete="off" aria-label="Ответ" value="${v}"${solved ? " disabled" : ""} data-enter="check">${item.unit ? `<span class="muted small">${esc(item.unit)}</span>` : ""}</div><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button>`}${item.hint && !solved ? `<button class="pill ghost" data-act="hint">Подсказка</button>` : ""}</div>`;
@@ -228,9 +228,9 @@
       body = `<textarea class="open-in" rows="3" placeholder="Напиши ответ своими словами" aria-label="Твой ответ"${solved ? " disabled" : ""}>${esc(prev)}</textarea><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button><button class="pill ghost" data-act="show">Показать ответ</button>`}</div>`;
     } else if (item.type === "sort") {
       const order = seeded(item.items, qid);
-      body = `<div class="sort-list">${order.map(({ v, i }) => `<div class="sort-item${solved ? " right" : ""}" data-i="${i}"><span>${md(v.text)}</span><div class="sort-b">${item.buckets.map((b, bi) => `<button data-act="pick" data-b="${bi}" class="${solved && v.b === bi ? "on" : ""}"${solved ? " disabled" : ""}>${esc(b)}</button>`).join("")}</div></div>`).join("")}</div><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button>`}</div>`;
+      body = `<div class="sort-list">${order.map(({ v, i }) => `<div class="sort-item${solved ? " right" : ""}" data-i="${i}"><span>${md(v.text)}</span><div class="sort-b">${item.buckets.map((b, bi) => `<button data-act="pick" data-b="${bi}" class="${solved && v.b === bi ? "on" : ""}"${solved ? ' aria-disabled="true"' : ""}>${esc(b)}</button>`).join("")}</div></div>`).join("")}</div><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button>`}</div>`;
     }
-    const fb = solved && !o.hideWhy ? `<div class="fb ok"><b>${item.type === "open" ? "Засчитано" : "Верно"}</b>${item.type === "open" ? `<div class="model"><b>Образцовый ответ</b>${md(item.model)}</div>` : md(item.why)}</div>${(item.type === "choice" || item.type === "multi") ? optBreakdown(item, (item.keep ? item.options.map((v, i) => ({ v, i })) : seeded(item.options, qid)).map((x) => x.i), null, false) : ""}<div class="qz-actions"><button class="pill ghost" data-act="redo">Решить заново</button></div>` : "";
+    const fb = solved && !o.hideWhy ? `<div class="fb ok"><b>${item.type === "open" ? "Засчитано" : "Верно"}</b>${item.type === "open" ? `<div class="model"><b>Образцовый ответ</b>${md(item.model)}</div>` : md(item.why)}</div>${(item.type === "choice" || item.type === "multi") ? optBreakdown(item, (item.keep ? item.options.map((v, i) => ({ v, i })) : seeded(item.options, qid)).map((x) => x.i), null, false) : ""}${["choice", "multi", "tf", "sort"].includes(item.type) ? `<p class="qtip-hint tiny muted"><span class="h-hover">Наведи курсор на вариант, чтобы увидеть, почему он верный или неверный.</span><span class="h-touch">Нажми на вариант, чтобы увидеть, почему он верный или неверный.</span></p>` : ""}<div class="qz-actions"><button class="pill ghost" data-act="redo">Решить заново</button></div>` : "";
     return `<div class="qz" data-q="${esc(qid)}"${mock ? ' data-mock="1"' : ""}>${badge}${o.noQ ? "" : `<p class="q">${md(item.q)}</p>`}${body}<div class="fb-slot">${fb}</div></div>`;
   }
   function record(qid, ok) {
@@ -251,7 +251,8 @@
     const slot = $(".fb-slot", el);
     const redo = ok ? `<div class="qz-actions"><button class="pill ghost" data-act="redo">Решить заново</button></div>` : `<div class="qz-actions"><button class="pill ghost" data-act="retry">Попробовать ещё раз</button></div>`;
     const ob = item.type === "choice" || item.type === "multi" ? optBreakdown(item, $$(".opt", el).map((b) => +b.dataset.i), chosen, !ok) : "";
-    slot.innerHTML = `<div class="fb ${ok ? "ok" : "bad"}"><b>${ok ? "Верно" : "Не совпало"}</b>${extra ? `${md(extra)}<br>` : ""}${md(item.why)}</div>${ob}${redo}`;
+    const tipHint = ["choice", "multi", "tf", "sort"].includes(item.type) ? `<p class="qtip-hint tiny muted"><span class="h-hover">Наведи курсор на вариант, чтобы увидеть, почему он верный или неверный.</span><span class="h-touch">Нажми на вариант, чтобы увидеть, почему он верный или неверный.</span></p>` : "";
+    slot.innerHTML = `<div class="fb ${ok ? "ok" : "bad"}"><b>${ok ? "Верно" : "Не совпало"}</b>${extra ? `${md(extra)}<br>` : ""}${md(item.why)}</div>${tipHint}${ob}${redo}`;
     revealExam(el);
   }
   const revealExam = (el) => { const box = el.closest(".exam-inline"); if (box) { $$(".exam-inline-sol", box).forEach((x) => (x.hidden = false)); return; } const qid = el.dataset.q; if (qid && qid.startsWith("exam.")) { const s = $("#sol"); if (s) s.hidden = false; const e = $("#sol-btn"); if (e) e.hidden = true; unlockPhoto(); } };
@@ -293,19 +294,65 @@
       const sel = $$(".opt.sel", el).map((b) => +b.dataset.i);
       if (!sel.length) return;
       const ok = sel.length === item.answer.length && sel.every((i) => item.answer.includes(i));
-      $$(".opt", el).forEach((b) => { const i = +b.dataset.i; b.disabled = true; b.classList.remove("sel"); if (item.answer.includes(i)) b.classList.add("right"); else if (sel.includes(i)) b.classList.add("wrong"); });
+      $$(".opt", el).forEach((b) => { const i = +b.dataset.i; b.setAttribute("aria-disabled", "true"); b.classList.remove("sel"); if (item.answer.includes(i)) b.classList.add("right"); else if (sel.includes(i)) b.classList.add("wrong"); });
       $$(".qz-actions .pill", el).forEach((b) => b.remove());
       record(qid, ok); feedback(el, ok, item, "", sel);
     } else if (item.type === "sort") {
       const rows = $$(".sort-item", el); const unset = rows.some((r) => !$(".on", r));
       if (unset) { $(".fb-slot", el).innerHTML = `<div class="fb hint">Распредели все строки.</div>`; return; }
       let ok = true;
-      rows.forEach((r) => { const it = item.items[+r.dataset.i], picked = +$(".on", r).dataset.b, good = picked === it.b; ok = ok && good; r.classList.add(good ? "right" : "wrong"); $$(".sort-b button", r).forEach((b) => { b.disabled = true; if (!good && +b.dataset.b === it.b) b.classList.add("truth"); }); });
+      rows.forEach((r) => { const it = item.items[+r.dataset.i], picked = +$(".on", r).dataset.b, good = picked === it.b; ok = ok && good; r.classList.add(good ? "right" : "wrong"); $$(".sort-b button", r).forEach((b) => { b.setAttribute("aria-disabled", "true"); if (!good && +b.dataset.b === it.b) b.classList.add("truth"); }); });
       $$(".qz-actions .pill", el).forEach((b) => b.remove());
       record(qid, ok); feedback(el, ok, item);
     }
     if (location.hash.startsWith("#/exam")) paintExamMap();
   }
+
+  /* ---------- Пояснение при наведении на вариант (только после ответа) ---------- */
+  let qtipEl = null, qtipFor = null, qtipPinned = false;
+  const QTIP_SEL = '.qz .opt[aria-disabled="true"], .qz .sort-b button[aria-disabled="true"]';
+  const canHover = () => window.matchMedia("(hover:hover) and (pointer:fine)").matches;
+  function qtipText(el) {
+    const qz = el.closest(".qz"), item = qz && getQ(qz.dataset.q); if (!item) return null;
+    const mine = el.classList.contains("wrong") || el.classList.contains("on");
+    if (item.type === "choice" || item.type === "multi") {
+      const i = +el.dataset.i, right = Array.isArray(item.answer) ? item.answer.includes(i) : item.answer === i, wrongPick = el.classList.contains("wrong");
+      const own = Array.isArray(item.ow) && item.ow.length === item.options.length ? item.ow[i] : "";
+      const fallback = right ? item.why : `Верный ответ: ${(Array.isArray(item.answer) ? item.answer : [item.answer]).map((j) => item.options[j]).join("; ")}. ${item.why || ""}`;
+      return { ok: right, label: right ? "Верный вариант" : wrongPick ? "Твой ответ — неверно" : "Неверный вариант", text: own || fallback };
+    }
+    if (item.type === "tf") {
+      const right = String(item.answer) === el.dataset.v;
+      return { ok: right, label: right ? "Верно" : el.classList.contains("wrong") ? "Твой ответ — неверно" : "Неверно", text: item.why };
+    }
+    if (item.type === "sort") {
+      const row = el.closest(".sort-item"), it = item.items[+row.dataset.i], bi = +el.dataset.b, right = bi === it.b, w = it.w || item.why;
+      return { ok: right, label: right ? (mine ? "Верно" : "Правильная категория") : mine ? "Твой выбор — неверно" : "Не сюда", head: item.buckets[bi], text: right ? w : `Правильно: ${item.buckets[it.b]}. ${w}` };
+    }
+    return null;
+  }
+  function qtipShow(el, pin) {
+    const t = qtipText(el); if (!t || !t.text) return;
+    if (!qtipEl) { qtipEl = document.createElement("div"); qtipEl.id = "qtip"; qtipEl.setAttribute("role", "tooltip"); document.body.appendChild(qtipEl); }
+    if (qtipFor && qtipFor !== el) qtipFor.removeAttribute("aria-describedby");
+    qtipEl.className = "qtip " + (t.ok ? "ok" : "no"); qtipEl.hidden = false;
+    qtipEl.innerHTML = `<b>${esc(t.label)}${t.head ? ` · ${esc(t.head)}` : ""}</b>${md(t.text)}`;
+    qtipFor = el; qtipPinned = !!pin; el.setAttribute("aria-describedby", "qtip");
+    const r = el.getBoundingClientRect(), w = qtipEl.offsetWidth, h = qtipEl.offsetHeight, vw = document.documentElement.clientWidth;
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), vw - w - 8); let top = r.top - h - 10, below = false;
+    if (top < 8) { top = r.bottom + 10; below = true; }
+    qtipEl.style.left = left + window.scrollX + "px"; qtipEl.style.top = top + window.scrollY + "px";
+    qtipEl.style.setProperty("--ax", Math.max(14, Math.min(w - 14, r.left + r.width / 2 - left)) + "px"); qtipEl.classList.toggle("below", below);
+  }
+  function qtipHide() { if (qtipFor) qtipFor.removeAttribute("aria-describedby"); qtipFor = null; qtipPinned = false; if (qtipEl) qtipEl.hidden = true; }
+  document.addEventListener("mouseover", (e) => { if (!canHover() || !e.target.closest) return; const el = e.target.closest(QTIP_SEL); if (el && el !== qtipFor) qtipShow(el, false); });
+  document.addEventListener("mouseout", (e) => { if (!qtipFor || qtipPinned || !e.target.closest || e.target.closest(QTIP_SEL) !== qtipFor) return; if (e.relatedTarget && qtipFor.contains(e.relatedTarget)) return; qtipHide(); });
+  document.addEventListener("focusin", (e) => { const el = e.target.closest && e.target.closest(QTIP_SEL); if (el) qtipShow(el, false); });
+  document.addEventListener("focusout", (e) => { if (qtipFor && e.target === qtipFor && !qtipPinned) qtipHide(); });
+  document.addEventListener("click", (e) => { if (qtipFor && !(e.target.closest && e.target.closest(QTIP_SEL))) qtipHide(); }, true);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && qtipFor) qtipHide(); });
+  window.addEventListener("hashchange", qtipHide);
+  window.addEventListener("resize", qtipHide);
 
   /* ---------- Каркас ---------- */
   const NAV = [["", "Главная", "Главная"], ["theory", "Теория", "Теория"], ["exam", "Контрольная", "Контрольная"], ["bank", "Банк заданий", "Банк"], ["schemes", "Схемы", "Схемы"]];
@@ -1246,16 +1293,17 @@
     if (!ac) return;
     const act = ac.dataset.act, qz = ac.closest(".qz");
     const isMock = qz && qz.dataset.mock;
+    if ((act === "opt" || act === "tf" || act === "pick") && ac.getAttribute("aria-disabled") === "true") { if (qtipFor === ac && qtipPinned) qtipHide(); else qtipShow(ac, true); return; }
     if (act === "opt") {
       const item = getQ(qz.dataset.q), i = +ac.dataset.i;
       if (isMock) { const a = S.mock.active; a.answers[qz.dataset.q] = i; save(); $$(".opt", qz).forEach((b) => b.classList.toggle("sel", b === ac)); return; }
       if (item.type === "multi") { ac.classList.toggle("sel"); return; }
       const ok = i === item.answer;
-      $$(".opt", qz).forEach((b) => { const j = +b.dataset.i; b.disabled = true; if (j === item.answer) b.classList.add("right"); else if (j === i) b.classList.add("wrong"); });
+      $$(".opt", qz).forEach((b) => { const j = +b.dataset.i; b.setAttribute("aria-disabled", "true"); if (j === item.answer) b.classList.add("right"); else if (j === i) b.classList.add("wrong"); });
       record(qz.dataset.q, ok); feedback(qz, ok, item, "", i); if (location.hash.startsWith("#/exam")) paintExamMap();
     } else if (act === "tf") {
       const item = getQ(qz.dataset.q), v = ac.dataset.v === "true", ok = v === item.answer;
-      $$(".opt", qz).forEach((b) => { const bv = b.dataset.v === "true"; b.disabled = true; if (bv === item.answer) b.classList.add("right"); else if (bv === v) b.classList.add("wrong"); });
+      $$(".opt", qz).forEach((b) => { const bv = b.dataset.v === "true"; b.setAttribute("aria-disabled", "true"); if (bv === item.answer) b.classList.add("right"); else if (bv === v) b.classList.add("wrong"); });
       record(qz.dataset.q, ok); feedback(qz, ok, item);
     } else if (act === "pick") {
       const row = ac.closest(".sort-item"); $$(".sort-b button", row).forEach((b) => b.classList.toggle("on", b === ac));
