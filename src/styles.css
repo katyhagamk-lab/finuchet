@@ -1020,8 +1020,7 @@ td .rt-ul{gap:3px}
 .bad-t{color:var(--bad)}
 
 /* Развёрнутый ответ на 8 баллов */
-.w-wrap{max-width:900px;margin-top:14px}
-.w-crit{max-width:900px}
+.w-wrap{margin-top:14px}
 .w-crit summary,.w-stm summary{cursor:pointer;font-size:15.5px}
 .w-stm{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 .w-q{margin-top:18px;padding:14px 16px;background:var(--lime-soft);border-radius:16px;font-size:16px;line-height:1.45}
@@ -1077,3 +1076,38 @@ td .rt-ul{gap:3px}
   .r-rp .rp-mini>.rp-mini-h:nth-child(2){margin-top:4px}
 }
 
+/* Сквозная задача: условие слева, вопросы и поля справа */
+.cws{container-type:inline-size;margin-bottom:6px}
+.cws-in{display:flex;flex-direction:column;gap:14px}
+.cws-cond{background:#FBFBFA;border-radius:22px;padding:0 18px}
+.paper .cws-cond,.white .cws-cond,.exam-inline .cws-cond{background:var(--card)}
+.cws-cond>summary{cursor:pointer;list-style:none;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:15px 0 13px}
+.cws-cond>summary::-webkit-details-marker{display:none}
+.cws-cond>summary b{font-weight:550}
+.cws-cond>summary::after{content:"+";margin-left:auto;color:var(--ink-3);font-weight:300;font-size:20px;line-height:1}
+.cws-cond[open]>summary::after{content:"−"}
+.cws-cond[open]{padding-bottom:16px}
+.cws-main{min-width:0;display:flex;flex-direction:column;gap:14px}
+.cws-main>.check,.cws-main>.paper,.cws-main>.gen-actions{margin-top:0}
+.num.flash-ok{animation:cellOk .75s var(--ease)}
+.num.flash-bad{animation:cellBad .45s var(--ease)}
+@container (min-width:760px){
+  .cws-in{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:18px;align-items:start}
+  .cws-cond{position:sticky;top:14px;max-height:calc(100vh - 28px);overflow:auto;overscroll-behavior:contain}
+  .cws-cond>summary{position:sticky;top:0;z-index:2;background:inherit}
+  .cws-body{font-size:15px}
+  .cws-body table{font-size:14px}
+}
+
+@media (prefers-reduced-motion:reduce){.num.flash-ok,.num.flash-bad{animation:none}}
+/* Условие сквозной задачи в левой колонке: компактная таблица, в узком блоке колонки поровну */
+.cws-body th{padding:8px 8px;font-size:12.5px}
+.cws-body td{padding:7px 8px}
+.cws-body th:first-child,.cws-body td:first-child{padding-left:12px}
+.cws-body th:last-child,.cws-body td:last-child{padding-right:12px}
+@container (min-width:760px) and (max-width:1040px){
+  .cws-in{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .cws-body table{font-size:13.5px}
+}
+/* В пробной сверху закреплена полоса с таймером: условие встаёт под неё */
+@container (min-width:760px){.sticky-mock~.cws .cws-cond{top:88px;max-height:calc(100vh - 102px)}}

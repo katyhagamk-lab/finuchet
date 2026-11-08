@@ -261,7 +261,7 @@
       body = `<div class="num-row"><input class="num${solved ? " right" : ""}" inputmode="decimal" autocomplete="off" aria-label="Ответ" value="${v}"${solved ? " disabled" : ""} data-enter="check">${item.unit ? `<span class="muted small">${esc(item.unit)}</span>` : ""}</div><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button>`}${item.hint && !solved ? `<button class="pill ghost" data-act="hint">Подсказка</button>` : ""}</div>`;
     } else if (item.type === "fields") {
       const ans = mock ? (S.mock.active && S.mock.active.answers[qid]) || {} : {};
-      body = `<div class="fields">${item.fields.map((f, i) => `${f.group ? `<div class="field-group">${esc(f.group)}</div>` : ""}<label class="field"><span>${md(f.label)}</span><input class="num${solved ? " right" : ""}" inputmode="text" autocomplete="off" data-f="${i}" value="${solved ? fmt(f.answer) : mock && ans[i] != null ? esc(ans[i]) : ""}"${solved ? " disabled" : ""} data-enter="check"><span class="expect"></span></label>`).join("")}</div>${mock ? "" : `<div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button><button class="pill ghost" data-act="show">Показать ответ</button>`}</div>`}`;
+      body = `<div class="fields">${item.fields.map((f, i) => `${f.group ? `<div class="field-group">${esc(f.group)}</div>` : ""}<label class="field"><span>${md(f.label)}</span><input class="num${solved ? " right" : ""}" inputmode="text" autocomplete="off" data-f="${i}" value="${solved ? fmt(f.answer) : mock && ans[i] != null ? esc(ans[i]) : ""}"${solved ? " disabled" : ""} data-enter="check"><span class="expect"></span></label>`).join("")}</div>${!mock && !solved && item.fields.length > 1 ? `<p class="tiny faint" style="margin:0 2px">Enter проверяет поле: красное — исправь, зелёное — курсор перейдёт дальше. «Проверить» — все поля сразу.</p>` : ""}${mock ? "" : `<div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button><button class="pill ghost" data-act="show">Показать ответ</button>`}</div>`}`;
     } else if (item.type === "open") {
       const prev = ((S.openAns || {})[qid]) || "";
       body = `<textarea class="open-in" rows="3" placeholder="Напиши ответ своими словами" aria-label="Твой ответ"${solved ? " disabled" : ""}>${esc(prev)}</textarea><div class="qz-actions">${solved ? "" : `<button class="pill ink" data-act="check">Проверить</button><button class="pill ghost" data-act="show">Показать ответ</button>`}</div>`;
@@ -623,19 +623,29 @@
     const m = l.mod, prev = LESSONS[l.idx - 1], nxt = LESSONS[l.idx + 1];
     const secs = l.sections.map((s, si) => `<section class="section" id="sec-${si}"><h2>${esc(s.title)}</h2><div class="blocks">${renderBlocks(s.blocks)}</div>${si === 0 && vizFor("lesson", l.id).length ? `<div style="margin-top:18px;display:flex;flex-direction:column;gap:14px">${vizFor("lesson", l.id).map(vizBlock).join("")}</div>` : ""}<div class="check"><div class="check-head"><span class="ring"></span><h3>Проверь себя</h3><span class="small muted" data-secstat="${si}"></span></div>${(s.quiz || []).map((q, qi) => quizHTML(`${l.id}.s${si}.q${qi}`, q)).join("")}</div></section>`).join("");
     const examLinks = (l.examTasks || []).map((n) => `<a class="tag lime" href="#/exam/${n}">Задание ${n}</a>`).join(" ");
+    const caseEx = (LESSON_EXAM[l.id] || []).some((n) => TASKS[n - 1].isCase), wide = !!RP_LESSONS[l.id] || caseEx;
+    const examSec = (LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : "";
     return `${crumbs([["", "Главная"], ["theory", "Теория"], [`m/${m.id}`, SHORT[m.id] || m.title], ["", l.title]])}
-    <div class="reader${RP_LESSONS[l.id] ? " has-rp" : ""}" data-lesson="${l.id}"><article class="r-main"><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${RP_LESSONS[l.id] ? `</article><div class="r-rp">${rpMini(l.id)}</div><article class="r-rest">` : ""}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что упущено.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
+    <div class="reader${wide ? " has-rp" : ""}" data-lesson="${l.id}"><article class="r-main"><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${wide ? `</article><div class="r-rp">${rpMini(l.id)}${caseEx ? examSec : ""}</div><article class="r-rest">` : ""}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что упущено.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${caseEx ? "" : examSec}
       <div class="glass" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-radius:28px"><button class="pill ghost" data-act="manual" data-id="${l.id}">${S.manual[l.id] ? "Снять отметку «изучено»" : "Отметить как изученный"}</button><div style="display:flex;gap:8px;flex-wrap:wrap">${prev ? `<a class="pill" href="#/l/${prev.id}">Назад</a>` : ""}${(() => { const c = dpFor(`l/${l.id}`), pn = c && dpAfter(c); return pn ? `${nxt ? `<a class="pill" href="#/l/${nxt.id}">Следующий урок</a>` : ""}<a class="pill ink" href="#/${pn.link}" title="${esc(pn.title)}">Дальше по плану</a>` : nxt ? `<a class="pill ink" href="#/l/${nxt.id}">Следующий урок</a>` : `<a class="pill ink" href="#/exam">К контрольной</a>`; })()}</div></div></article>
     <div class="toc-col"><aside class="toc"><h4>В этом уроке</h4>${l.sections.map((s, si) => `<a href="#/l/${l.id}" data-scroll="sec-${si}" data-toc="${si}" class="${secState(l, si)}"><i></i><span>${esc(s.title)}</span></a>`).join("")}${openFor(l.id).length ? `<a href="#/l/${l.id}" data-scroll="sec-open" class="${openFor(l.id).every((o) => isOk(`open.${o.id}`)) ? "done" : ""}"><i></i><span>Ответь своими словами</span></a>` : ""}${RP_LESSONS[l.id] ? `<a href="#/l/${l.id}" data-scroll="sec-rp" class="${(() => { const c = rpMiniCount(l.id); return c.ok === c.total ? "done" : ""; })()}"><i></i><span>Строки в отчётах</span></a>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<a href="#/l/${l.id}" data-scroll="sec-exam" class="${LESSON_EXAM[l.id].every((n) => isOk(`exam.${n}`)) ? "done" : ""}"><i></i><span>Задание с контрольной</span></a>` : ""}<div class="toc-progress" id="toc-progress">${tocProgress(l)}</div></aside></div></div>`;
   }
+  /* Сквозная задача: условие слева (не уезжает при прокрутке, своя прокрутка), вопросы и поля справа.
+     Раскладка в две колонки включается, когда блоку хватает ширины (container query в styles.css); на узкой ширине условие сверху. */
+  const CWS_CLOSE = `</div></div></div>`;
+  function cwsOpen(condHTML, title, openNarrow) {
+    const open = openNarrow || window.matchMedia("(min-width:1081px)").matches;
+    return `<div class="cws"><div class="cws-in"><details class="cws-cond"${open ? " open" : ""}><summary><b>${esc(title)}</b><span class="tiny muted">ведомость и операции за год</span></summary><div class="cws-body">${condHTML}</div></details><div class="cws-main">`;
+  }
   function examInline(n) {
     const t = TASKS[n - 1], st = S.quiz[`exam.${n}`];
-    return `<section class="exam-inline" id="exam-after-${n}"><div class="exam-inline-head"><span class="ring"></span><h3>Задание ${n} с контрольной</h3><span class="tag">${esc(t.topic)}</span></div>
-      ${t.isCase ? `<details><summary class="small muted" style="cursor:pointer;margin-bottom:10px">Показать данные сквозной задачи</summary><div class="blocks">${renderBlocks(t.cond.slice(0, -1))}</div></details><div class="blocks">${renderBlocks(t.cond.slice(-1))}</div>` : `<div class="blocks">${renderBlocks(t.cond)}</div>`}
+    const body = `<div class="blocks">${renderBlocks(t.isCase ? t.cond.slice(-1) : t.cond)}</div>
       <div style="margin-top:12px">${quizHTML(`exam.${n}`, t.quiz, { noBadge: false })}</div>
       ${t.photo.verdict === "bad" || t.photo.verdict === "warn" ? `<div class="exam-inline-sol"${st ? "" : " hidden"}><div class="b-note trap" style="margin-top:12px"><b>Пометки на фото</b><span>${md(t.photo.text)}</span></div></div>` : ""}
       <div class="exam-inline-sol"${st ? "" : " hidden"}><div class="blocks" style="margin-top:14px">${renderBlocks(t.sol)}</div></div>
-      <div class="qz-actions"><button class="pill ghost" data-act="inline-sol">Показать разбор</button><a class="pill ghost" href="#/exam/${n}">Открыть на странице контрольной</a></div></section>`;
+      <div class="qz-actions"><button class="pill ghost" data-act="inline-sol">Показать разбор</button><a class="pill ghost" href="#/exam/${n}">Открыть на странице контрольной</a></div>`;
+    return `<section class="exam-inline" id="exam-after-${n}"><div class="exam-inline-head"><span class="ring"></span><h3>Задание ${n} с контрольной</h3><span class="tag">${esc(t.topic)}</span></div>
+      ${t.isCase ? `${cwsOpen(renderBlocks(t.cond.slice(0, -1)), "Данные сквозной задачи 18–22")}<div>${body}</div>${CWS_CLOSE}` : body}</section>`;
   }
   const tocProgress = (l) => { const ids = lessonQids(l), ok = ids.filter(isOk).length; return `Верно ${ok} из ${ids.length} мини-заданий`; };
   function paintProgress(qid) {
@@ -677,10 +687,10 @@
     const t = TASKS[n - 1], st = S.quiz[`exam.${n}`], ls = LINKS[n] || [], shown = st != null;
     const photoCl = { ok: "ok", bad: "bad", warn: "warn" }[t.photo.verdict] || "", pen = { ok: "✓", bad: "!", warn: "?" }[t.photo.verdict] || "–";
     return `<div class="exam-layout"><div id="exam-main">
-      <div class="paper"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><h2 class="h-sm">Условие</h2><span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><span class="tag">${esc(t.kind)}</span>${PTS(n) ? `<span class="tag lime">${ptsWord(PTS(n))}</span>` : ""}</span></div>${t.isCase && n !== 18 ? `<details><summary class="small muted" style="cursor:pointer;margin-bottom:10px">Показать данные задачи (общие для заданий 18–22)</summary><div class="blocks">${renderBlocks(t.cond.slice(0, -1))}</div></details><div class="blocks" style="margin-top:10px">${renderBlocks(t.cond.slice(-1))}</div>` : `<div class="blocks">${renderBlocks(t.cond)}</div>`}${t.recog ? `<p class="tiny faint" style="margin-top:12px">${esc(t.recog)}</p>` : ""}</div>
+      ${t.isCase ? cwsOpen(renderBlocks(t.cond.slice(0, -1)), "Данные сквозной задачи 18–22", n === 18) : ""}<div class="paper"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><h2 class="h-sm">${t.isCase ? "Вопрос" : "Условие"}</h2><span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><span class="tag">${esc(t.kind)}</span>${PTS(n) ? `<span class="tag lime">${ptsWord(PTS(n))}</span>` : ""}</span></div><div class="blocks">${renderBlocks(t.isCase ? t.cond.slice(-1) : t.cond)}</div>${t.recog ? `<p class="tiny faint" style="margin-top:12px">${esc(t.recog)}</p>` : ""}</div>
       <div class="check" id="exam-try"><div class="check-head"><span class="ring"></span><h3>Реши сам</h3></div>${quizHTML(`exam.${n}`, t.quiz, { noBadge: false })}</div>
       ${shown ? "" : `<button class="pill ghost" id="sol-btn" data-act="show-sol" style="margin-top:12px">Показать разбор сразу</button>`}
-      <section id="sol"${shown ? "" : " hidden"} style="margin-top:26px"><h2 class="h-md" style="margin-bottom:14px">Разбор</h2><div class="steps blocks">${renderBlocks(t.sol)}</div>${vizFor("task", n).length ? `<div style="margin-top:22px;display:flex;flex-direction:column;gap:14px">${vizFor("task", n).slice(0, 2).map(vizBlock).join("")}</div>` : ""}${schemesFor("task", n).length ? `<h3 class="h-sm" style="margin:22px 0 12px">Схема, чтобы запомнить</h3>${schemeStrip(schemesFor("task", n).slice(0, 2))}` : ""}</section>
+      <section id="sol"${shown ? "" : " hidden"} style="margin-top:26px"><h2 class="h-md" style="margin-bottom:14px">Разбор</h2><div class="steps blocks">${renderBlocks(t.sol)}</div>${vizFor("task", n).length ? `<div style="margin-top:22px;display:flex;flex-direction:column;gap:14px">${vizFor("task", n).slice(0, 2).map(vizBlock).join("")}</div>` : ""}${schemesFor("task", n).length ? `<h3 class="h-sm" style="margin:22px 0 12px">Схема, чтобы запомнить</h3>${schemeStrip(schemesFor("task", n).slice(0, 2))}` : ""}</section>${t.isCase ? CWS_CLOSE : ""}
       <div style="display:flex;justify-content:space-between;gap:8px;margin-top:26px">${n > 1 ? `<a class="pill" href="#/exam/${n - 1}">Задание ${n - 1}</a>` : "<span></span>"}${n < 22 ? `<a class="pill ink" href="#/exam/${n + 1}">Задание ${n + 1}</a>` : `<a class="pill ink" href="#/mock">Пробная контрольная</a>`}</div>
     </div><aside class="exam-side">
       <div class="photo-note ${photoCl}" id="photo-note"${shown ? "" : " hidden"}><span class="pen">${pen}</span><div><b style="font-weight:550;display:block;margin-bottom:2px">Пометки на фото</b>${md(t.photo.text)}</div></div>${shown ? "" : `<div class="photo-note" id="photo-lock"><span class="pen">?</span><div><b style="font-weight:550;display:block;margin-bottom:2px">Пометки на фото</b>Откроются после твоего ответа или разбора: в них видно, что обвели на контрольной.</div></div>`}
@@ -718,7 +728,11 @@
     const list = mockTasks(a);
     list.forEach((t) => { EPH[`mock.${t.n}`] = t.quiz; });
     return `<div class="sticky-mock"><span class="h-sm">Пробная контрольная</span><span class="dots" id="mock-time" style="font-size:26px">--:--</span><button class="pill ink" data-act="mock-submit">Сдать работу</button></div>
-    ${list.map((t) => `<section style="margin-bottom:18px" id="mq-${t.n}">${t.n === 18 ? `<div class="paper" style="margin-bottom:14px"><h2 class="h-sm" style="margin-bottom:10px">Задания 18–22: общие данные</h2><div class="blocks">${renderBlocks(t.caseCond ? t.cond : EX.tasks[17].cond.slice(0, -1))}</div></div>` : ""}<div class="white" style="border-radius:24px"><h3 class="h-sm" style="margin-bottom:10px;display:flex;justify-content:space-between;gap:10px;align-items:center">Задание ${t.n}${PTS(t.n) ? `<span class="tag">${ptsWord(PTS(t.n))}</span>` : ""}</h3>${t.isCase ? "" : `<div class="blocks" style="margin-bottom:12px">${renderBlocks(t.cond)}</div>`}${quizHTML(`mock.${t.n}`, t.quiz, { mock: true })}</div></section>`).join("")}
+    ${(() => {
+      const sec = (t) => `<section style="margin-bottom:18px" id="mq-${t.n}"><div class="white" style="border-radius:24px"><h3 class="h-sm" style="margin-bottom:10px;display:flex;justify-content:space-between;gap:10px;align-items:center">Задание ${t.n}${PTS(t.n) ? `<span class="tag">${ptsWord(PTS(t.n))}</span>` : ""}</h3>${t.isCase ? "" : `<div class="blocks" style="margin-bottom:12px">${renderBlocks(t.cond)}</div>`}${quizHTML(`mock.${t.n}`, t.quiz, { mock: true })}</div></section>`;
+      const cs = list.filter((t) => t.isCase), c18 = cs.find((t) => t.n === 18);
+      return list.filter((t) => !t.isCase).map(sec).join("") + (cs.length ? `${cwsOpen(renderBlocks(c18 && c18.caseCond ? c18.cond : EX.tasks[17].cond.slice(0, -1)), "Задания 18–22: общие данные", true)}<div>${cs.map(sec).join("")}</div>${CWS_CLOSE}` : "");
+    })()}
     <div style="display:flex;justify-content:center;margin:26px 0"><button class="pill ink" data-act="mock-submit">Сдать работу</button></div>`;
   }
   function startMockClock() {
@@ -1107,7 +1121,7 @@
     const seed = trainSeeds[id] || (trainSeeds[id] = Math.floor(Math.random() * 1e9) + 1), task = G.run(id, seed), qid = `gen.${id}.${seed}`, t = S.train[id];
     EPH[qid] = Object.assign(task.quiz, { trainId: id });
     return `${crumbs([["", "Главная"], ["train", "Тренажёры"], ["", g.title]])}<div class="pagehead"><div><h1 class="h-lg" style="font-size:clamp(30px,4vw,46px)">${g.title}</h1><p class="muted" style="margin-top:8px">${g.desc}</p></div><div style="text-align:right;flex:none"><span class="dots" style="font-size:36px" id="tr-stat">${t ? t.ok : 0}</span><div class="tiny muted" id="tr-sub">${t ? `верно из ${t.total}` : "верных решений"}</div></div></div>
-    <div style="max-width:860px"><div class="paper"><div class="blocks">${renderBlocks(task.cond)}</div></div><div class="check">${quizHTML(qid, task.quiz, {})}</div><div class="gen-actions"><button class="pill ink" data-act="gen-next" data-id="${id}">Новое задание</button><button class="pill ghost" data-act="gen-sol">Показать решение</button></div><section id="gen-sol" hidden style="margin-top:10px"><h2 class="h-md" style="margin-bottom:14px">Решение</h2><div class="blocks">${renderBlocks(task.sol)}</div></section></div>`;
+    <div style="${g.big ? "" : "max-width:860px"}">${g.big ? cwsOpen(renderBlocks(task.cond), "Условие задачи", true) : `<div class="paper"><div class="blocks">${renderBlocks(task.cond)}</div></div>`}<div class="check">${quizHTML(qid, task.quiz, {})}</div><div class="gen-actions"><button class="pill ink" data-act="gen-next" data-id="${id}">Новое задание</button><button class="pill ghost" data-act="gen-sol">Показать решение</button></div><section id="gen-sol" hidden style="margin-top:10px"><h2 class="h-md" style="margin-bottom:14px">Решение</h2><div class="blocks">${renderBlocks(task.sol)}</div></section>${g.big ? CWS_CLOSE : ""}</div>`;
   }
   const trainSeeds = {};
   function paintTrainStat(id) { const t = S.train[id], a = $("#tr-stat"), b = $("#tr-sub"); if (a && t) { a.textContent = t.ok; b.textContent = `верно из ${t.total}`; } const s = $("#gen-sol"); if (s) s.hidden = false; }
@@ -1184,10 +1198,8 @@
     <div class="pagehead"><div><h1 class="h-lg" style="font-size:clamp(30px,4vw,46px)">Развёрнутый ответ на 8 баллов</h1><p class="muted" style="margin-top:8px;max-width:64ch">Задание IV типа из методички: разобрать факты хозяйственной жизни, рассчитать показатели и письменно обосновать вывод. Числа проверяются сразу, письменную часть сверяешь с образцом и оцениваешь по шкале преподавателя.</p></div><div style="text-align:right;flex:none"><span class="dots" style="font-size:36px">${st ? st.ok : 0}</span><div class="tiny muted">${st && st.ok ? `решено, последний балл ${st.last} из 8` : "заданий решено"}</div></div></div>
     <div class="chips" style="margin-bottom:14px" role="group" aria-label="Тема анализа">${AN.THEMES.map((th) => `<button class="chip ${th.id === W.theme ? "on" : ""}" data-act="w-theme" data-th="${th.id}" aria-pressed="${th.id === W.theme}">${esc(th.title)}</button>`).join("")}</div>
     <details class="white w-crit"><summary>Как оценивает преподаватель: четыре критерия и шкала 0, 4, 6, 8</summary><div class="blocks" style="margin-top:14px">${renderBlocks(muCritBlocks())}</div></details>
-    <div class="w-wrap">
-      <div class="paper"><div class="blocks">${renderBlocks(t.cond)}</div>
-        <div class="w-q"><b>Задание.</b> ${md(t.q)}</div><p class="small muted" style="margin-top:8px">${md(t.rules)}</p>
-        <details class="w-stm"><summary>Отчёты уже собраны: открыть, чтобы сосредоточиться на анализе</summary><div class="blocks" style="margin-top:12px">${renderBlocks(t.statements)}</div></details></div>
+    <div class="w-wrap">${cwsOpen(`${renderBlocks(t.cond)}<details class="w-stm"><summary>Отчёты уже собраны: открыть, чтобы сосредоточиться на анализе</summary><div class="blocks" style="margin-top:12px">${renderBlocks(t.statements)}</div></details>`, "Условие сквозной задачи", true)}
+      <div class="paper"><div class="w-q" style="margin-top:0"><b>Задание.</b> ${md(t.q)}</div><p class="small muted" style="margin-top:8px">${md(t.rules)}</p></div>
       <div class="check w-box">
         <h3 class="h-sm">Расчёты</h3><div class="fields" id="w-fields">${wFieldsHTML(t)}</div>
         <h3 class="h-sm" style="margin-top:14px">Письменный ответ</h3><p class="small muted" style="margin-top:-6px">Как на бумаге: формула и расчёт, что повлияло, вывод, рекомендация. Только термины учёта.</p>
@@ -1195,7 +1207,7 @@
         <div class="qz-actions"><button class="pill ink" data-act="w-check">Проверить и сравнить с образцом</button><button class="pill ghost" data-act="w-template">Вставить план ответа</button></div>
         <div id="w-res">${W.res ? wResultHTML(t) : ""}</div>
       </div>
-      <div class="gen-actions"><button class="pill" data-act="w-new">Новое задание</button></div>
+      <div class="gen-actions"><button class="pill" data-act="w-new">Новое задание</button></div>${CWS_CLOSE}
     </div>`;
   }
   function wResultHTML(t) {
@@ -1391,7 +1403,7 @@
     return `${crumbs([["", "Главная"], ["bank", "Банк заданий"], ["", t.label]])}
     <div class="pagehead"><div><h1 class="h-lg" style="font-size:clamp(30px,4vw,46px)">${esc(t.title)}</h1><p class="muted" style="margin-top:8px"><span id="bank-stat">Решено ${bankDone(n)} из ${list.length}</span></p><div class="chips" style="margin-top:12px"><a class="chip" href="#/${exLink}">Разбор ${n === 18 ? "заданий 18–22" : `задания ${n}`} из контрольной</a>${(EX.tasks[n - 1].gen ? `<a class="chip" href="#/train/${EX.tasks[n - 1].gen}">Тренажёр с новыми числами</a>` : "")}${(LINKS[n] || []).length ? `<a class="chip" href="#/l/${[...LINKS[n]].sort((a, b) => a.examTasks.length - b.examTasks.length)[0].id}">Теория</a>` : ""}</div></div></div>
     ${sch.length ? `<div style="max-width:860px;margin-bottom:24px">${schemeStrip(sch.slice(0, 2))}</div>` : ""}
-    <div style="max-width:860px;display:flex;flex-direction:column;gap:18px">${list.map((x, i) => bankCard(`bank.${n}.${i}`, x, n === 18 ? `Компания «${x.company}»` : `Задание ${i + 1}`)).join("")}</div>`;
+    <div style="${n === 18 ? "" : "max-width:860px;"}display:flex;flex-direction:column;gap:18px">${list.map((x, i) => bankCard(`bank.${n}.${i}`, x, n === 18 ? `Компания «${x.company}»` : `Задание ${i + 1}`)).join("")}</div>`;
   }
   function viewOpenBank() {
     const byMod = MODS.filter((m) => OPENQ.some((o) => o.mod === m));
@@ -1399,7 +1411,8 @@
     <div class="chips" style="margin-bottom:18px">${byMod.map((m) => `<a class="chip" href="#/bank/open" data-scroll="om-${m.id}">${esc(SHORT[m.id] || m.title)}</a>`).join("")}</div>
     <div style="max-width:860px;display:flex;flex-direction:column;gap:12px">${byMod.map((m) => `<h2 class="h-md" id="om-${m.id}" style="margin-top:14px;scroll-margin-top:14px">${esc(m.title)}</h2>${OPENQ.filter((o) => o.mod === m).map((o) => `<div><div class="tiny muted" style="margin:0 0 6px 6px"><a href="#/l/${o.lesson}">${esc(LMAP[o.lesson] ? LMAP[o.lesson].title : "")}</a></div>${quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item, { noBadge: true })}</div>`).join("")}`).join("")}</div>`;
   }
-  const bankCard = (qid, x, title) => `<article class="paper bank-card" id="${esc(qid)}"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 class="h-sm">${esc(title)}</h2>${isOk(qid) ? `<span class="tag lime">Решено</span>` : isTried(qid) ? `<span class="tag bad">Была ошибка</span>` : ""}</div><div class="blocks">${renderBlocks(x.cond)}</div><div style="margin-top:12px">${quizHTML(qid, x.quiz, { noBadge: true })}</div>${x.sol && x.sol.length ? `<details class="case-step" style="margin:12px 0 0"><summary>Показать разбор</summary><div class="blocks">${renderBlocks(x.sol)}</div></details>` : ""}</article>`;
+  const bankCard = (qid, x, title) => { const q = `<div style="margin-top:12px">${quizHTML(qid, x.quiz, { noBadge: true })}</div>${x.sol && x.sol.length ? `<details class="case-step" style="margin:12px 0 0"><summary>Показать разбор</summary><div class="blocks">${renderBlocks(x.sol)}</div></details>` : ""}`;
+    return `<article class="paper bank-card" id="${esc(qid)}"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 class="h-sm">${esc(title)}</h2>${isOk(qid) ? `<span class="tag lime">Решено</span>` : isTried(qid) ? `<span class="tag bad">Была ошибка</span>` : ""}</div>${x.company ? `${cwsOpen(renderBlocks(x.cond), "Условие сквозной задачи", true)}<div>${q}</div>${CWS_CLOSE}` : `<div class="blocks">${renderBlocks(x.cond)}</div>${q}`}</article>`; };
 
   /* ---------- Варианты контрольной ---------- */
   const varBest = (id) => { const h = S.mock.history.filter((r) => r.mode === "var" && r.v === id); return h.length ? Math.max(...h.map(recPts)) : null; };
@@ -1427,10 +1440,10 @@
     return `${crumbs([["", "Главная"], ["variants", "Варианты"], [`v/${id}`, v.title], ["", "С проверкой"]])}<h1 class="h-lg" style="margin-bottom:14px">${esc(v.title)}, с проверкой</h1>
     <div class="result-grid no-print" style="margin-bottom:20px;grid-template-columns:repeat(11,minmax(0,1fr))">${v.tasks.map((t) => { const st = S.quiz[`var.${id}.${t.n}`]; return `<a class="tile ${st ? (st.ok ? "ok" : "bad") : ""}" style="height:44px;border-radius:14px;font-size:15px" href="#/v/${id}/study" data-scroll="vt-${t.n}">${t.n}</a>`; }).join("")}</div>
     <div style="max-width:860px;display:flex;flex-direction:column;gap:16px">${v.tasks.filter((t) => !t.isCase).map(task).join("")}
-      <div class="paper" id="vt-case"><h2 class="h-sm" style="margin-bottom:10px">Задания 18–22: общие данные</h2><div class="blocks">${renderBlocks(c.cond)}</div></div>
+    </div><div id="vt-case" style="margin-top:16px;scroll-margin-top:14px">${cwsOpen(renderBlocks(c.cond), "Задания 18–22: общие данные", true)}
       ${v.tasks.filter((t) => t.isCase).map(task).join("")}
-      <details class="case-step"><summary>Полное решение сквозной задачи</summary><div class="blocks">${renderBlocks(c.sol)}</div></details>
-    </div><div style="display:flex;justify-content:space-between;margin-top:20px;gap:8px">${id > 1 ? `<a class="pill" href="#/v/${id - 1}">Вариант ${id - 1}</a>` : "<span></span>"}${id < BK.VARIANTS ? `<a class="pill ink" href="#/v/${id + 1}">Вариант ${id + 1}</a>` : `<a class="pill ink" href="#/variants">Все варианты</a>`}</div>`;
+      <details class="case-step" style="margin:0"><summary>Полное решение сквозной задачи</summary><div class="blocks">${renderBlocks(c.sol)}</div></details>
+    ${CWS_CLOSE}</div><div style="display:flex;justify-content:space-between;margin-top:20px;gap:8px">${id > 1 ? `<a class="pill" href="#/v/${id - 1}">Вариант ${id - 1}</a>` : "<span></span>"}${id < BK.VARIANTS ? `<a class="pill ink" href="#/v/${id + 1}">Вариант ${id + 1}</a>` : `<a class="pill ink" href="#/variants">Все варианты</a>`}</div>`;
   }
   function viewVariantPrint(id) {
     const v = BK.variants[id - 1]; if (!v) return notFound();
@@ -1664,7 +1677,21 @@
   });
   document.addEventListener("keydown", (e) => {
     const t = e.target, typing = t.matches && t.matches("input,textarea,select");
-    if (e.key === "Enter" && t.dataset && t.dataset.enter === "check") { const q = t.closest(".qz"); if (q && !q.dataset.mock) { e.preventDefault(); doCheck(q); } return; }
+    if (e.key === "Enter" && t.dataset && t.dataset.enter === "check") {
+      const q = t.closest(".qz"); if (!q) return; e.preventDefault();
+      const nextIn = () => { const ins = $$(".field .num:not([disabled])", q), nx = ins[ins.indexOf(t) + 1]; if (nx) { nx.focus(); nx.select(); return true; } return false; };
+      if (q.dataset.mock) { nextIn(); return; }
+      const item = getQ(q.dataset.q);
+      if (item && item.type === "fields" && t.closest(".field") && item.fields.length > 1) {
+        if (!t.value.trim()) { if (!nextIn()) doCheck(q); return; }
+        const f = item.fields[+t.dataset.f], ok = checkField(f, t) || !!(item.alt && parseNum(t.value) === item.alt.values[+t.dataset.f]);
+        t.classList.toggle("right", ok); t.classList.toggle("wrong", !ok);
+        t.classList.remove("flash-ok", "flash-bad"); void t.offsetWidth; t.classList.add(ok ? "flash-ok" : "flash-bad"); clearTimeout(t._fl); t._fl = setTimeout(() => t.classList.remove("flash-ok", "flash-bad"), 750);
+        if (ok) { if (!nextIn()) { const b = $('[data-act="check"]', q); if (b) b.focus(); } } else t.select();
+        return;
+      }
+      doCheck(q); return;
+    }
     if (e.key === "Escape") { closeOv(); return; }
     if (e.key === "Enter" && t.id === "acc-in") { const b = $('[data-act="acc-login"]'); if (b) b.click(); return; }
     if (e.key === "Enter" && t.id === "search-in") { const a = $("#search-res .res.on"); if (a) a.click(); return; }
