@@ -43,6 +43,7 @@ const html = `<!doctype html>
 <script>window.BANKTESTS=${JSON.stringify(bankTests).replace(/<\/(script)/gi, "<\\/$1")};window.SCHEME_IMG=${JSON.stringify(schemeImg)};</script>
 <script>${read("schemes.js")}</script>
 <script>${read("viz.js")}</script>
+<script>${read("tacc.js")}</script>
 <script>${read("bankcalc.js")}</script>
 <script>${read("bank.js")}</script>
 <script>${read("grade.js")}</script>

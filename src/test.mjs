@@ -82,5 +82,28 @@ for (let i = 1; i <= 500; i++) for (const th of AN.THEMES) {
 }
 const tcx = AN.textCheck("Вывод: дебиторская задолженность выросла на 15 500, деньги на счёте уменьшились до 16 800. Рекомендация: сократить отсрочку.", [{ l: "дебиторка", s: ["дебитор"] }]);
 eq(tcx.hits[0].ok && tcx.concl && tcx.reco && tcx.nums >= 2 && tcx.lex.length === 1, true, "проверка письменного ответа");
+// Т-счета в уроках: сальдо на схемах совпадает с ответами в тексте, разноска сквозного примера сходится с ОСВ
+vm.runInContext(fs.readFileSync(path.join(here, "tacc.js"), "utf8"), ctx);
+const TA = ctx.window.TACC, num = (x) => (x === "" || x === undefined ? 0 : +String(x).replace(/[*\s\u00a0]/g, ""));
+for (const m of fs.readdirSync(path.join(here, "content")).filter((x) => /^m\d+$/.test(x))) for (const f of fs.readdirSync(path.join(here, "content", m)).filter((x) => /^l\d+\.json$/.test(x))) {
+  const L = JSON.parse(fs.readFileSync(path.join(here, "content", m, f), "utf8"));
+  L.sections.forEach((sec, si) => sec.blocks.forEach((b) => {
+    const w = `${L.id} раздел ${si + 1}: ${b.title || b.id}`;
+    if (b.t === "tacc") {
+      b.accs.forEach((a) => { eq(!!TA.KIND[a.kind], true, `${w}: тип счёта ${a.kind}`); const c = TA.calc(a); if (c.numeric) { eq(c.close, a.close, `${w}: сальдо «${a.name}»`); eq(c.close >= 0, true, `${w}: сальдо неотрицательное`); } });
+      const h = TA.block(b); eq(/undefined|NaN|\[object/.test(h), false, `${w}: схема без мусора`);
+    }
+    if (b.t === "tdouble") b.ops.forEach((o) => { eq(!!(TA.KIND[o.dt[1]] && TA.KIND[o.kt[1]]), true, `${w}: типы счетов ${o.label}`); eq(o.sum === undefined || Number.isFinite(o.sum), true, `${w}: сумма ${o.label}`); eq(/undefined|NaN/.test(TA.double({ ops: [o] })), false, `${w}: ${o.label} без мусора`); });
+    if (b.t === "viz") eq(b.id === "t-post", true, `${w}: интерактивная схема есть`);
+  }));
+  if (L.id === "m3-l07") {
+    const osv = L.sections[3].blocks.find((b) => b.t === "table" && /ОСВ/.test(b.caption)), st = TA.postState(TA.POST.ops.length);
+    TA.POST.accs.forEach((a, i) => { const r = osv.rows.find((x) => x[0] === a.osv), c = TA.calc(st[i]);
+      eq(!!r, true, `ОСВ: строка ${a.osv}`); if (!r) return;
+      eq(c.od, num(r[4]), `ОСВ ${a.osv}: оборот Дт`); eq(c.ok, num(r[5]), `ОСВ ${a.osv}: оборот Кт`); eq(a.open, num(r[2]) + num(r[3]), `ОСВ ${a.osv}: сальдо на начало`); eq(c.close, num(c.side === "dt" ? r[6] : r[7]), `ОСВ ${a.osv}: сальдо на конец`); });
+    const tot = osv.rows.find((x) => /Итого/.test(x[0])), cs = st.map(TA.calc);
+    eq(cs.reduce((x, c) => x + c.od, 0), num(tot[4]), "ОСВ: итого оборотов Дт"); eq(cs.reduce((x, c) => x + c.ok, 0), num(tot[5]), "ОСВ: итого оборотов Кт");
+  }
+}
 console.log(`Банк: ${BK.total}. Варианты: ${BK.variants.length}.`);
 console.log(`Запусков генераторов: ${runs}. Проверок пройдено: ${pass}. Ошибок: ${fail}.`); process.exit(fail ? 1 : 0);

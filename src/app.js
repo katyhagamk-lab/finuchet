@@ -220,6 +220,9 @@
       case "note": { const sp = b.kind === "exam" ? spoilerTasks(b.text) : []; if (sp.length) return `<details class="b-note exam spoiler"><summary><b>${sp.length > 1 ? `Подсказка к заданиям ${sp.join(" и ")}` : `Подсказка к заданию ${sp[0]}`} контрольной</b><span class="tiny">Внутри подсказка к ответу. Сначала попробуй решить ${sp.map((n) => `<a href="#/exam/${n}">задание ${n}</a>`).join(" и ")} самостоятельно.</span></summary><span>${rich(b.text)}</span></details>`; return `<div class="b-note ${b.kind}"><b>${NOTE[b.kind] || ""}</b><span>${rich(b.text)}</span></div>`; }
       case "case": return renderCase(b.part);
       case "scheme": { const x = SCHEMES.find((y) => y.id === b.id); return x ? schemeFigure(x) : ""; }
+      case "tacc": return window.TACC ? window.TACC.block(b) : "";
+      case "tdouble": return window.TACC ? window.TACC.double(b) : "";
+      case "viz": { const v = VZ.find((y) => y.id === b.id); return v ? vizBlock(v) : ""; }
       default: return "";
     }
   }
@@ -1348,7 +1351,7 @@
 
   /* ---------- Поиск и настройки ---------- */
   let searchIndex = null;
-  const blockText = (b) => { switch (b.t) { case "def": return `${b.term} ${b.text}`; case "list": return b.items ? b.items.join(" ") : b.groups.flatMap((g) => [g.h, ...g.items]).join(" "); case "table": return [...b.head, ...b.rows.flat()].join(" "); case "example": return [b.title, b.given, ...b.steps, b.result].join(" "); case "formula": return `${b.text} ${b.note || ""}`; case "entries": return b.rows.map((r) => r.op).join(" "); case "eq": return b.rows.map((r) => r.op).join(" "); default: return b.text || ""; } };
+  const blockText = (b) => { switch (b.t) { case "def": return `${b.term} ${b.text}`; case "list": return b.items ? b.items.join(" ") : b.groups.flatMap((g) => [g.h, ...g.items]).join(" "); case "table": return [...b.head, ...b.rows.flat()].join(" "); case "example": return [b.title, b.given, ...b.steps, b.result].join(" "); case "formula": return `${b.text} ${b.note || ""}`; case "entries": return b.rows.map((r) => r.op).join(" "); case "eq": return b.rows.map((r) => r.op).join(" "); case "tacc": case "tdouble": return b.title || ""; case "viz": return ""; default: return b.text || ""; } };
   function buildIndex() {
     searchIndex = [];
     LESSONS.forEach((l) => (l.sections || []).forEach((s, si) => searchIndex.push({ title: l.title, sub: s.title, text: (s.blocks || []).map(blockText).join(" ").replace(/\*\*/g, "").replace(/\n(- )?/g, " "), link: `l/${l.id}`, scroll: `sec-${si}` })));

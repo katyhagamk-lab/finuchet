@@ -1111,3 +1111,96 @@ td .rt-ul{gap:3px}
 }
 /* В пробной сверху закреплена полоса с таймером: условие встаёт под неё */
 @container (min-width:760px){.sticky-mock~.cws .cws-cond{top:88px;max-height:calc(100vh - 102px)}}
+
+/* Т-счета в уроках: схема буквой Т и текст «Как читать схему» с теми же номерами */
+.tacc{background:#fff;border-radius:24px;padding:18px 20px 20px;margin:0;container-type:inline-size}
+.tacc>figcaption{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.tacc>figcaption b{font-size:17px;font-weight:500;letter-spacing:-.018em;line-height:1.3}
+.tacc-in{display:grid;gap:16px}
+.tacc-ts{display:grid;gap:12px;align-items:start}
+.tacc.two .tacc-ts{grid-template-columns:repeat(2,minmax(0,1fr))}
+@container (max-width:520px){.tacc.two .tacc-ts{grid-template-columns:minmax(0,1fr)}}
+.tacc.three .tacc-ts{display:flex;flex-wrap:wrap;justify-content:center}
+.tacc.three .tt{flex:1 1 260px;max-width:calc(50% - 6px)}
+@container (max-width:560px){.tacc.three .tt{max-width:100%;flex-basis:100%}}
+@container (min-width:640px){.tacc.one .tacc-in{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:start}}
+.tt{background:var(--card);border-radius:16px;padding:10px 12px 12px;font-size:14.5px;line-height:1.3;min-width:0;container-type:inline-size}
+.tt-h{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:end;gap:8px;padding:0 2px 7px;border-bottom:2.5px solid var(--ink)}
+.tt-h>span{font-size:12.5px;color:var(--ink-2);line-height:1.2}
+.tt-h>b{text-align:center;font-weight:550;font-size:15px;letter-spacing:-.012em;line-height:1.22;overflow-wrap:break-word}
+.tt-kind{font-style:normal;display:inline-block;font-size:11px;font-weight:600;padding:1px 6px;border-radius:6px;background:#fff;color:var(--ink-2);vertical-align:1px;margin-left:2px;letter-spacing:0}
+.tt-b{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.tt-c{padding:5px 9px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tt-c.dt{border-right:2.5px solid var(--ink)}
+.tt-c.sub{padding-top:4px;padding-bottom:2px}
+.tt-c.sub small{font-size:11.5px;color:var(--ink-3);line-height:1.2}
+.tt-c.ent{min-height:30px}
+.tt-c.open,.tt-c.turn,.tt-c.close{flex-direction:row;align-items:center;gap:6px}
+.tt-c.turn{border-top:1.5px solid rgba(27,28,31,.22);padding-top:6px;margin-top:2px}
+.tt-c .lab{color:var(--ink-2);font-size:12.5px}
+.tt-c b{font-weight:550;font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:auto}
+.tt-e{display:flex;align-items:baseline;gap:6px;min-width:0}
+.tt-e.hi{background:var(--lime);border-radius:7px;margin:0 -5px;padding:1px 5px}
+.tt-e.hi b.s{color:var(--ink);font-weight:600}
+.tt-cap{display:flex;gap:6px;align-items:flex-start;font-size:12.5px;color:var(--ink-2);line-height:1.25}
+.tt-op{font-style:normal;font-size:11px;font-weight:600;padding:1px 5px;border-radius:6px;background:#fff;color:var(--ink-2);flex:none;line-height:1.35}
+.ck{display:inline-flex;align-items:baseline;gap:6px;background:var(--lime);border-radius:8px;padding:2px 7px;margin-left:auto}
+.ck b{margin-left:0}
+.tt-c b.s{white-space:normal;min-width:0;overflow-wrap:anywhere;hyphens:auto;font-weight:450;color:var(--ink-2);text-align:right;line-height:1.25}.tt-e b.s{margin-left:auto}
+.tt-c.none{grid-column:1/-1;flex-direction:row;justify-content:center;align-items:center;gap:6px;text-align:center;font-size:13px;color:var(--ink-2);border-top:1.5px solid rgba(27,28,31,.22);padding-top:7px;margin-top:2px}
+.tt-m{font-style:normal;flex:none;width:18px;height:18px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:600;display:inline-grid;place-items:center;line-height:1}
+@container (max-width:250px){.tt-h{grid-template-columns:1fr 1fr;grid-template-areas:"n n" "d k";row-gap:3px}.tt-h>b{grid-area:n}.tt-h>span:first-child{grid-area:d}.tt-h>span:last-child{grid-area:k;text-align:right}.tt-h>span{font-size:0}.tt-h>span::after{content:attr(data-s);font-size:12px}.tt-c{padding:4px 6px}.tt-c .lab{font-size:11.5px}}
+@container (max-width:200px){
+  .tt-c{padding:4px 4px}.tt-c b{font-size:12px}.tt-c .lab{font-size:10.5px}
+  .tt-c.sub .w{display:none}.tt-c.sub small{font-size:13px}
+  .tt-c.open,.tt-c.turn,.tt-c.close{gap:3px;flex-wrap:wrap}
+  .ck{padding:1px 4px;gap:0 2px;justify-content:flex-end;flex-wrap:wrap;min-width:0}
+  .tt-op{font-size:10px;padding:0 4px}.tt-e{gap:3px}.tt-e.hi{margin:0 -3px;padding:1px 3px}
+  .tt-h>b{font-size:13px}
+}
+.tacc-read{display:grid;gap:8px;align-content:start}
+.tacc-rh{font-size:13px;color:var(--ink-2)}
+.tacc-read p{font-size:15px;line-height:1.44}
+.tacc-read ol{margin:0;padding:0;list-style:none;display:grid;gap:9px}
+.tacc-read li{display:grid;grid-template-columns:12px minmax(0,1fr);gap:8px;font-size:15px;line-height:1.44}
+.tacc-read li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink-3);margin-top:.6em}
+.tacc-read ol.mk li{grid-template-columns:18px minmax(0,1fr)}
+.tacc-read ol.mk li::before{display:none}
+.tacc-read ol.mk .tt-m{margin-top:2px}
+.tacc-note{font-size:14px;line-height:1.42;color:var(--ink-2)}
+.tdouble .td-lead{font-size:15px;line-height:1.44;margin:-4px 0 12px;max-width:68ch}
+.td-list{display:grid;gap:14px}
+.td-op+.td-op{border-top:1px solid var(--line);padding-top:14px}
+.td-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.td-h b{font-weight:550;font-size:15.5px;letter-spacing:-.01em}
+.td-h .tt-op{background:var(--ink);color:#fff}
+.td-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.td-entry{font-size:14px;color:var(--ink-2);margin-top:9px}
+.td-read{margin:5px 0 0;padding:0;list-style:none;display:grid;gap:5px;font-size:15px;line-height:1.44}
+.td-read .up{color:var(--ok);font-weight:550;white-space:nowrap}.td-read .dn{color:var(--bad);font-weight:550;white-space:nowrap}
+.tdouble>.tacc-note{margin-top:12px}
+/* Шесть операций на Т-счетах */
+.viz[data-viz="t-post"]{grid-column:1/-1}
+.tp-chips{display:flex;flex-wrap:wrap;gap:6px}
+.tp-chip{display:inline-flex;gap:6px;align-items:center;padding:5px 11px 5px 5px;border-radius:999px;background:var(--card);font-size:13.5px;color:var(--ink-2);transition:background .2s,color .2s}
+.tp-chip i{font-style:normal;font-size:11.5px;font-weight:600;background:#fff;border-radius:999px;padding:1px 7px;color:var(--ink-2)}
+.tp-chip.done{color:var(--ink)}.tp-chip.done i{background:var(--ink);color:#fff}
+.tp-chip.on{background:var(--lime);color:var(--ink)}.tp-chip.on i{background:var(--ink);color:#fff}
+.tp-say{font-size:15px;line-height:1.44}
+.tp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-items:start}
+.tp-grid .tt{font-size:13.5px}.tp-grid .tt-c.sub{display:none}.tp-grid .tt-h>b{font-size:14px}
+.tp-sum{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:var(--card);border-radius:14px;padding:10px 14px;transition:background .3s}
+.tp-sum>div{display:grid}.tp-sum small{font-size:12px;color:var(--ink-2)}.tp-sum b{font-variant-numeric:tabular-nums;font-weight:550}
+.tp-sum>span{font-size:18px;color:var(--ink-2)}
+.tp-sum .sep{width:1px;align-self:stretch;background:rgba(27,28,31,.14);margin:0 4px}
+.tp-sum.end{background:var(--ok-soft)}
+@media (max-width:760px){
+  .tacc{padding:16px 14px 16px;border-radius:20px}
+  .tt{padding:8px 8px 10px;font-size:13.5px}
+  .tt-c{padding:4px 7px}
+  .tp-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .tp-grid .tt,.td-pair .tt{padding:7px 5px 9px}
+  .viz[data-viz="t-post"]{padding:18px 12px}
+  .td-pair,.tacc.two .tacc-ts{gap:8px}
+}
+
