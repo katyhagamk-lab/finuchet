@@ -624,9 +624,9 @@
     const secs = l.sections.map((s, si) => `<section class="section" id="sec-${si}"><h2>${esc(s.title)}</h2><div class="blocks">${renderBlocks(s.blocks)}</div>${si === 0 && vizFor("lesson", l.id).length ? `<div style="margin-top:18px;display:flex;flex-direction:column;gap:14px">${vizFor("lesson", l.id).map(vizBlock).join("")}</div>` : ""}<div class="check"><div class="check-head"><span class="ring"></span><h3>Проверь себя</h3><span class="small muted" data-secstat="${si}"></span></div>${(s.quiz || []).map((q, qi) => quizHTML(`${l.id}.s${si}.q${qi}`, q)).join("")}</div></section>`).join("");
     const examLinks = (l.examTasks || []).map((n) => `<a class="tag lime" href="#/exam/${n}">Задание ${n}</a>`).join(" ");
     return `${crumbs([["", "Главная"], ["theory", "Теория"], [`m/${m.id}`, SHORT[m.id] || m.title], ["", l.title]])}
-    <div class="reader" data-lesson="${l.id}"><article><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${rpMini(l.id)}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что упущено.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
+    <div class="reader${RP_LESSONS[l.id] ? " has-rp" : ""}" data-lesson="${l.id}"><article class="r-main"><header style="margin-bottom:30px"><h1 class="h-lg" style="font-size:clamp(31px,3.8vw,46px)">${esc(l.title)}</h1><p class="muted" style="margin-top:10px;max-width:62ch">${esc(l.summary || "")}</p><div class="chips" style="margin-top:12px;align-items:center"><span class="tag">${l.minutes || 10} мин</span>${examLinks}</div><p class="src-line">Источник: ${esc(l.src || "")}</p></header>${schemesFor("lesson", l.id).length ? `<div style="margin-bottom:36px">${schemeStrip(schemesFor("lesson", l.id))}</div>` : ""}${secs}${RP_LESSONS[l.id] ? `</article><div class="r-rp">${rpMini(l.id)}</div><article class="r-rest">` : ""}${openFor(l.id).length ? `<div class="section" id="sec-open"><h2>Ответь своими словами</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Напиши ответ, как на устном опросе. Проверка ищет в нём ключевые идеи и показывает, что упущено.</p><div class="check" style="margin-top:0">${openFor(l.id).map((o) => quizHTML(`open.${o.id}`, QREG[`open.${o.id}`].item)).join("")}</div></div>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<div class="section" id="sec-exam"><h2>Как это было на контрольной</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задание с настоящей контрольной на только что пройденную тему. Решённое здесь засчитывается и на странице контрольной.</p><div style="display:flex;flex-direction:column;gap:14px">${LESSON_EXAM[l.id].map(examInline).join("")}</div></div>` : ""}
       <div class="glass" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-radius:28px"><button class="pill ghost" data-act="manual" data-id="${l.id}">${S.manual[l.id] ? "Снять отметку «изучено»" : "Отметить как изученный"}</button><div style="display:flex;gap:8px;flex-wrap:wrap">${prev ? `<a class="pill" href="#/l/${prev.id}">Назад</a>` : ""}${(() => { const c = dpFor(`l/${l.id}`), pn = c && dpAfter(c); return pn ? `${nxt ? `<a class="pill" href="#/l/${nxt.id}">Следующий урок</a>` : ""}<a class="pill ink" href="#/${pn.link}" title="${esc(pn.title)}">Дальше по плану</a>` : nxt ? `<a class="pill ink" href="#/l/${nxt.id}">Следующий урок</a>` : `<a class="pill ink" href="#/exam">К контрольной</a>`; })()}</div></div></article>
-    <aside class="toc"><h4>В этом уроке</h4>${l.sections.map((s, si) => `<a href="#/l/${l.id}" data-scroll="sec-${si}" data-toc="${si}" class="${secState(l, si)}"><i></i><span>${esc(s.title)}</span></a>`).join("")}${openFor(l.id).length ? `<a href="#/l/${l.id}" data-scroll="sec-open" class="${openFor(l.id).every((o) => isOk(`open.${o.id}`)) ? "done" : ""}"><i></i><span>Ответь своими словами</span></a>` : ""}${RP_LESSONS[l.id] ? `<a href="#/l/${l.id}" data-scroll="sec-rp" class="${(() => { const c = rpMiniCount(l.id); return c.ok === c.total ? "done" : ""; })()}"><i></i><span>Строки в отчётах</span></a>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<a href="#/l/${l.id}" data-scroll="sec-exam" class="${LESSON_EXAM[l.id].every((n) => isOk(`exam.${n}`)) ? "done" : ""}"><i></i><span>Задание с контрольной</span></a>` : ""}<div class="toc-progress" id="toc-progress">${tocProgress(l)}</div></aside></div>`;
+    <div class="toc-col"><aside class="toc"><h4>В этом уроке</h4>${l.sections.map((s, si) => `<a href="#/l/${l.id}" data-scroll="sec-${si}" data-toc="${si}" class="${secState(l, si)}"><i></i><span>${esc(s.title)}</span></a>`).join("")}${openFor(l.id).length ? `<a href="#/l/${l.id}" data-scroll="sec-open" class="${openFor(l.id).every((o) => isOk(`open.${o.id}`)) ? "done" : ""}"><i></i><span>Ответь своими словами</span></a>` : ""}${RP_LESSONS[l.id] ? `<a href="#/l/${l.id}" data-scroll="sec-rp" class="${(() => { const c = rpMiniCount(l.id); return c.ok === c.total ? "done" : ""; })()}"><i></i><span>Строки в отчётах</span></a>` : ""}${(LESSON_EXAM[l.id] || []).length ? `<a href="#/l/${l.id}" data-scroll="sec-exam" class="${LESSON_EXAM[l.id].every((n) => isOk(`exam.${n}`)) ? "done" : ""}"><i></i><span>Задание с контрольной</span></a>` : ""}<div class="toc-progress" id="toc-progress">${tocProgress(l)}</div></aside></div></div>`;
   }
   function examInline(n) {
     const t = TASKS[n - 1], st = S.quiz[`exam.${n}`];
@@ -839,7 +839,7 @@
     <div class="statement rp-table${two ? " two" : ""}" data-col="${RP.col}"><table><thead><tr><th class="rp-code">Код</th><th>Показатель</th>${f.cols.map((c, ci) => `<th class="r c${ci}">${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>
     <div class="rp-actions"><button class="pill ink" data-act="rp-check">Проверить отчёт</button><button class="pill ghost" data-act="rp-show">Показать ответы</button><button class="pill ghost" data-act="rp-clear">Очистить</button>${next ? `<button class="pill rp-next" data-act="rp-tab" data-fk="${next[0]}">Дальше: ${next[1]} ${ICON.next}</button>` : ""}</div>
     <div class="fb-slot" id="rp-fb">${rpAllDone() ? rpDoneFb() : ""}</div>
-    <p class="rp-keys tiny faint">Enter — следующая строка, ↑ ↓ — по строкам. Считать можно прямо в ячейке: 45000+350000−52000.${learn ? " Σ в итоговой строке сложит твои строки выше." : ""}</p>`;
+    <p class="rp-keys tiny faint">${learn ? "Enter — проверить ячейку: если неверно, курсор останется в ней с подсказкой; если верно, перейдёт дальше. Стрелка ↓ — дальше без проверки." : "Enter — следующая строка, ↑ ↓ — по строкам."} Считать можно прямо в ячейке: 45000+350000−52000.${learn ? " Σ в итоговой строке сложит твои строки выше." : ""}</p>`;
   }
   function rpCell(fk, f, r, ri, ci, d, learn) {
     const id = `${fk}.${ri}.${ci}`, raw = d[id] || "", st = learn && String(raw).trim() ? (rpOk(r, ci, raw) ? "right" : "wrong") : "", sig = learn && r.f;
@@ -902,6 +902,11 @@
     const host = inp.closest(".rp-host");
     $$(".rp-host tr.cur").forEach((x) => x.classList.remove("cur")); inp.closest("tr").classList.add("cur");
     RP.focus = { fk, ri: +ri, ci: +ci, host }; rpHighlight(r, host); rpPaintHint();
+  }
+  /* Вспышка после Enter: зелёная, если верно; красное покачивание, если нет */
+  function rpFlash(inp, ok) {
+    const box = inp.parentElement; box.classList.remove("flash-ok", "flash-bad"); void box.offsetWidth;
+    box.classList.add(ok ? "flash-ok" : "flash-bad"); clearTimeout(box._fl); box._fl = setTimeout(() => box.classList.remove("flash-ok", "flash-bad"), 750);
   }
   function rpMark(inp, force) {
     const [fk, ri, ci] = inp.dataset.cell.split("."), r = RP.F[fk].rows[+ri], raw = rpData()[inp.dataset.cell] || "", box = inp.parentElement, has = String(raw).trim() !== "";
@@ -1023,7 +1028,8 @@
     const osvRows = table.rows.filter((r) => big || osv.has(String(r[0]).trim()));
     const osvHTML = osvRows.length ? `<div class="rp-osv"><table><thead><tr>${table.head.map((h, i) => `<th class="${i > 1 ? "r" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${osvRows.map((r) => `<tr data-acc="${esc(String(r[0]).trim())}">${r.map((c, i) => `<td class="${i > 1 ? "r" : ""}">${md(String(c))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : "";
     const opsHTML = `<ol class="rp-ops plain">${list.items.map((it, i) => { const k = RP.opKeys[i]; return big || ops.has(k) ? `<li data-op="${k}"><span class="op-n">${i + 1}</span><span class="op-t">${md(it)}</span></li>` : ""; }).join("")}</ol>`;
-    const condHTML = big ? `<details class="rp-mini-cond"><summary>Условие задачи с контрольной <span class="tiny muted">ведомость и операции за год</span></summary>${osvHTML}${opsHTML}</details>`
+    const side = window.matchMedia("(min-width:1081px)").matches;
+    const condHTML = big ? `<details class="rp-mini-cond"${side ? " open" : ""}><summary>Условие задачи с контрольной <span class="tiny muted">ведомость и операции за год</span></summary>${osvHTML}${opsHTML}</details>`
       : `<div class="rp-mini-cond"><p class="rp-mini-label">Что нужно из условия</p>${osvHTML}${opsHTML}</div>`;
     const tables = blocks.map(({ fk, all, f, items }) => {
       const used = [...new Set(items.flatMap((x) => x.cols))].sort();
@@ -1035,7 +1041,7 @@
     return `<div class="section" id="sec-rp"><h2>Строки в отчётах</h2><p class="muted" style="margin:-8px 0 14px;max-width:62ch">Задача с контрольной, задания 18–22. Посчитай строки по теме урока: встань в ячейку, и появится подсказка. Ответы сохраняются в «Собери отчёты сам».</p>
       <div class="rp-host rp-mini" data-lesson="${lid}">${condHTML}${tables}
       <div class="rp-actions"><button class="pill ink" data-act="rp-mcheck">Проверить</button><a class="pill" href="#/reports" data-act="rp-open" data-fk="${blocks[0].fk}">Собрать отчёты целиком ${ICON.next}</a><span class="tiny muted rp-mstat">${rpMiniStatText(lid)}</span></div>
-      <div class="fb-slot rp-mfb"></div><p class="rp-keys tiny faint">Enter — следующая ячейка. Считать можно прямо в ячейке: 45000+350000−52000. Σ сложит строки отчёта.</p></div></div>`;
+      <div class="fb-slot rp-mfb"></div><p class="rp-keys tiny faint">Enter — проверить ячейку: если неверно, курсор останется в ней с подсказкой; если верно, перейдёт дальше. Стрелка ↓ — дальше без проверки. Считать можно прямо в ячейке: 45000+350000−52000. Σ сложит строки отчёта.</p></div></div>`;
   }
   function rpMiniCount(lid) {
     rpEnsure(0); const d = rpData(); let total = 0, ok = 0;
@@ -1066,6 +1072,13 @@
     const t = e.target; if (!t.matches || !t.matches(".rp-host input[data-cell]")) return;
     const dir = e.key === "Enter" ? (e.shiftKey ? -1 : 1) : e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0; if (!dir) return;
     e.preventDefault();
+    if (e.key === "Enter" && !e.shiftKey && t.value.trim() && RP.F && (t.closest(".rp-mini") || rpLearn())) {
+      rpCommit(t);
+      const [fk, ri, ci] = t.dataset.cell.split("."), raw = rpData()[t.dataset.cell] || "", ok = rpOk(RP.F[fk].rows[+ri], +ci, raw);
+      rpFlash(t, ok);
+      if (!ok) { t.value = raw; t.dataset.orig = raw; t.select(); if (RP.focus) rpPaintHint(); return; }
+      t.dataset.orig = t.value;
+    }
     const mhost = t.closest(".rp-mini");
     if (mhost) { const all = $$("input[data-cell]", mhost), nx = all[all.indexOf(t) + dir]; if (nx) { nx.focus(); nx.select(); } else if (e.key === "Enter") { t.blur(); const b = $('[data-act="rp-mcheck"]', mhost); if (b) b.focus(); } return; }
     const ci = t.dataset.cell.split(".")[2], col = $$(`#rp-form input[data-cell$=".${ci}"]`);

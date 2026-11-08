@@ -1052,3 +1052,28 @@ td .rt-ul{gap:3px}
   .wheel-top .seg a{flex:0 0 auto;padding:10px 10px}
   .seg-lg{display:none}.seg-sm{display:inline}
 }
+
+/* Отчёты: проверка ячейки по Enter */
+.rp-table .cellbox.wrong input:focus{border-color:var(--bad);background:#fff;color:var(--bad)}
+.cellbox.wrong input:focus~.cell-st{opacity:1}
+.cellbox.flash-ok input{animation:cellOk .75s var(--ease)}
+.cellbox.flash-bad input{animation:cellBad .45s var(--ease)}
+@keyframes cellOk{0%{box-shadow:0 0 0 0 rgba(31,138,75,.55)}100%{box-shadow:0 0 0 10px rgba(31,138,75,0)}}
+@keyframes cellBad{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@media (prefers-reduced-motion:reduce){.cellbox.flash-ok input,.cellbox.flash-bad input{animation:none}}
+
+.toc-col{display:contents}
+/* Строки в отчётах в уроке: на широком экране блок на всю ширину, условие слева, бланк справа */
+@media (min-width:1081px){
+  .reader.has-rp{row-gap:0}
+  .reader.has-rp>.r-main{grid-column:1;grid-row:1}
+  .reader.has-rp>.toc-col{display:block;grid-column:2;grid-row:1;align-self:stretch}
+  .reader.has-rp>.r-rp{grid-column:1/-1;grid-row:2}
+  .reader.has-rp>.r-rest{grid-column:1;grid-row:3}
+  .r-rp .rp-mini{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);column-gap:18px;align-items:start}
+  .r-rp .rp-mini>*{grid-column:2}
+  .r-rp .rp-mini>.rp-mini-cond{grid-column:1;grid-row:1/span 30;position:sticky;top:14px;max-height:calc(100vh - 28px);overflow:auto;overscroll-behavior:contain;margin:0}
+  .r-rp details.rp-mini-cond>summary{position:sticky;top:0;z-index:1;background:var(--card)}
+  .r-rp .rp-mini>.rp-mini-h:nth-child(2){margin-top:4px}
+}
+
