@@ -105,5 +105,27 @@ for (const m of fs.readdirSync(path.join(here, "content")).filter((x) => /^m\d+$
     eq(cs.reduce((x, c) => x + c.od, 0), num(tot[4]), "ОСВ: итого оборотов Дт"); eq(cs.reduce((x, c) => x + c.ok, 0), num(tot[5]), "ОСВ: итого оборотов Кт");
   }
 }
+// Сквозная задача на Т-счетах: сальдо счетов дают баланс задачи на начало и конец, обороты Дт = Кт, 90 и 91 закрыты
+const caseT = (cs, w) => {
+  const M = TA.caseModel(cs), B = TA.caseBalance(M), calcs = M.order.map((id) => TA.calc(M.A[id]));
+  for (const k of ["os", "zap", "dz", "fv", "ds", "uk", "nrp", "zs", "kz", "total"]) { eq(B.start[k], cs.start[k], `${w}: Т-счета, ${k} на начало`); eq(B.end[k], cs.end[k], `${w}: Т-счета, ${k} на конец`); }
+  eq(B.end.pas, B.end.total, `${w}: Т-счета, пассив = актив на конец`);
+  eq(calcs.reduce((x, c) => x + c.od, 0), calcs.reduce((x, c) => x + c.ok, 0), `${w}: обороты Дт = Кт`);
+  eq(TA.calc(M.A["90"]).close === 0 && TA.calc(M.A["91"]).close === 0, true, `${w}: 90 и 91 закрыты`);
+  eq(/undefined|NaN/.test(TA.caseBlock(cs)), false, `${w}: схема без мусора`);
+};
+caseT(G.solveCase(G.CASE_BASE), "контрольная");
+BC.CASES.forEach((c) => caseT(c.s, `банк «${c.company}»`));
+for (let i = 1; i <= 300; i++) caseT(G.solveCase(G.seedCase(i * 7919)), `случайная задача ${i}`);
+// Разборы заданий: Т-схемы в контрольной, банке и тренажёре
+const solBlocks = [...E.tasks.flatMap((t) => (t.sol || []).map((b) => [b, `задание ${t.n}`])), ...(BC.TASKS[7] || []).flatMap((t, i) => (t.sol || []).map((b) => [b, `банк 7.${i + 1}`]))];
+for (let i = 0; i < 60; i++) { const g = G.run("equation", i * 31 + 5); (g.sol || []).forEach((b) => solBlocks.push([b, `тренажёр 7, запуск ${i}`])); }
+let tbalN = 0;
+solBlocks.forEach(([b, w]) => {
+  if (b.t === "tbal") { tbalN++; const L = b.left.reduce((x, r) => x + r[1], 0), R = b.right.reduce((x, r) => x + r[1], 0); eq(L, R, `${w}: актив = пассив на схеме`); eq(b.right[b.ask] !== undefined, true, `${w}: искомое на схеме`); eq(/undefined|NaN/.test(TA.bal(b)), false, `${w}: схема баланса без мусора`); }
+  if (b.t === "tdouble") eq(/undefined|NaN/.test(TA.double(b)), false, `${w}: схема операции без мусора`);
+});
+eq(tbalN >= 70, true, "схема баланса есть в разборах задания 7");
+eq(E.tasks[6].sol.some((b) => b.t === "tbal") && E.tasks[8].sol.some((b) => b.t === "tdouble"), true, "Т-схемы в разборе заданий 7 и 9");
 console.log(`Банк: ${BK.total}. Варианты: ${BK.variants.length}.`);
 console.log(`Запусков генераторов: ${runs}. Проверок пройдено: ${pass}. Ошибок: ${fail}.`); process.exit(fail ? 1 : 0);

@@ -222,6 +222,8 @@
       case "scheme": { const x = SCHEMES.find((y) => y.id === b.id); return x ? schemeFigure(x) : ""; }
       case "tacc": return window.TACC ? window.TACC.block(b) : "";
       case "tdouble": return window.TACC ? window.TACC.double(b) : "";
+      case "tbal": return window.TACC ? window.TACC.bal(b) : "";
+      case "tcase": return window.TACC ? window.TACC.caseBlock(b.s || G.solveCase(G.CASE_BASE), b) : "";
       case "viz": { const v = VZ.find((y) => y.id === b.id); return v ? vizBlock(v) : ""; }
       default: return "";
     }
@@ -238,10 +240,13 @@
     return `<figure class="scheme" id="sch-${x.id}"><button class="scheme-img" data-act="zoom" data-id="${x.id}" aria-label="Открыть схему «${esc(x.title)}» на весь экран"><img loading="lazy" decoding="async" src="${SIMG[x.id]}" alt="${esc(x.title)}: ${esc(x.text.join(". "))}"></button><figcaption>${opt.noTitle ? "" : `<b>${esc(x.title)}</b>`}<span>${md(x.note || "")}</span><details><summary>Текст схемы</summary><ul>${x.text.map((t) => `<li>${md(t)}</li>`).join("")}</ul></details></figcaption></figure>`;
   }
   const schemeStrip = (list) => (list.length ? `<div class="scheme-strip">${list.map((x) => schemeFigure(x)).join("")}</div>` : "");
+  /* На странице задания схема на Т-счетах стоит под разбором на всю ширину, а в шаге разбора только ссылка на неё */
+  let caseTOut = false;
+  const caseTWide = () => (window.TACC ? window.TACC.caseBlock(G.solveCase(G.CASE_BASE)) : "");
   function renderCase(open) {
     const c = EX.caseSteps;
-    const parts = [["open", "Шаг 1. Из ОСВ в баланс на начало года", c.open], ["ops", "Шаг 2. Разбор всех операций", c.ops], ["pl", "Шаг 3. Отчёт о финансовых результатах", c.pl], ["cf", "Шаг 4. Отчёт о движении денежных средств", c.cf], ["bs", "Шаг 5. Баланс на конец года и сверка", c.bs]];
-    return `<div class="case-steps">${parts.map(([k, title, body]) => `<details class="case-step"${k === open ? " open" : ""}><summary>${title}</summary><div class="blocks">${renderBlocks(body)}</div></details>`).join("")}</div>`;
+    const parts = [["open", "Шаг 1. Из ОСВ в баланс на начало года", c.open], ["ops", "Шаг 2. Разбор всех операций", c.ops], ["tacc", "Шаг 3. Все операции на Т-счетах: от ОСВ до баланса", caseTOut ? `<p>Все счета задачи с сальдо на начало, операциями года и сальдо на конец показаны ниже под разбором, на всю ширину страницы.</p><button class="pill" data-act="scroll-tcase">К схеме на Т-счетах</button>` : [{ t: "tcase" }]], ["pl", "Шаг 4. Отчёт о финансовых результатах", c.pl], ["cf", "Шаг 5. Отчёт о движении денежных средств", c.cf], ["bs", "Шаг 6. Баланс на конец года и сверка", c.bs]], opens = String(open).split("+");
+    return `<div class="case-steps">${parts.map(([k, title, body]) => `<details class="case-step"${opens.includes(k) ? " open" : ""}><summary>${title}</summary><div class="blocks">${typeof body === "string" ? body : renderBlocks(body)}</div></details>`).join("")}</div>`;
   }
 
   /* ---------- Движок заданий ---------- */
@@ -300,7 +305,7 @@
     slot.innerHTML = `<div class="fb ${ok ? "ok" : "bad"}"><b>${ok ? "Верно" : "Не совпало"}</b>${extra ? `${md(extra)}<br>` : ""}${md(item.why)}</div>${tipHint}${ob}${redo}`;
     revealExam(el);
   }
-  const revealExam = (el) => { const box = el.closest(".exam-inline"); if (box) { $$(".exam-inline-sol", box).forEach((x) => (x.hidden = false)); return; } const qid = el.dataset.q; if (qid && qid.startsWith("exam.")) { const s = $("#sol"); if (s) s.hidden = false; const e = $("#sol-btn"); if (e) e.hidden = true; unlockPhoto(); } };
+  const revealExam = (el) => { const box = el.closest(".exam-inline"); if (box) { $$(".exam-inline-sol", box).forEach((x) => (x.hidden = false)); return; } const qid = el.dataset.q; if (qid && qid.startsWith("exam.")) { const s = $("#sol"); if (s) s.hidden = false; const st = $("#sol-t"); if (st) st.hidden = false; const e = $("#sol-btn"); if (e) e.hidden = true; unlockPhoto(); } };
   const unlockPhoto = () => { const a = $("#photo-note"), b = $("#photo-lock"); if (a) a.hidden = false; if (b) b.remove(); };
   function openFeedback(item, r) {
     const chips = r.hits.map((h) => `<span class="kw ${h.ok ? "ok" : "miss"}">${h.ok ? "✓" : "✗"} ${esc(h.l)}</span>`).join("");
@@ -689,11 +694,13 @@
   function examBody(n) {
     const t = TASKS[n - 1], st = S.quiz[`exam.${n}`], ls = LINKS[n] || [], shown = st != null;
     const photoCl = { ok: "ok", bad: "bad", warn: "warn" }[t.photo.verdict] || "", pen = { ok: "✓", bad: "!", warn: "?" }[t.photo.verdict] || "–";
+    caseTOut = !!t.isCase; const solHTML = renderBlocks(t.sol); caseTOut = false;
+    const tWide = t.isCase && window.TACC ? `<section id="sol-t" class="sol-t"${shown ? "" : " hidden"}>${n === 18 || n === 19 ? caseTWide() : `<details class="case-step"><summary>Вся задача на Т-счетах: от ОСВ до баланса</summary><div class="blocks">${caseTWide()}</div></details>`}</section>` : "";
     return `<div class="exam-layout"><div id="exam-main">
       ${t.isCase ? cwsOpen(renderBlocks(t.cond.slice(0, -1)), "Данные сквозной задачи 18–22", n === 18) : ""}<div class="paper"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><h2 class="h-sm">${t.isCase ? "Вопрос" : "Условие"}</h2><span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><span class="tag">${esc(t.kind)}</span>${PTS(n) ? `<span class="tag lime">${ptsWord(PTS(n))}</span>` : ""}</span></div><div class="blocks">${renderBlocks(t.isCase ? t.cond.slice(-1) : t.cond)}</div>${t.recog ? `<p class="tiny faint" style="margin-top:12px">${esc(t.recog)}</p>` : ""}</div>
       <div class="check" id="exam-try"><div class="check-head"><span class="ring"></span><h3>Реши сам</h3></div>${quizHTML(`exam.${n}`, t.quiz, { noBadge: false })}</div>
       ${shown ? "" : `<button class="pill ghost" id="sol-btn" data-act="show-sol" style="margin-top:12px">Показать разбор сразу</button>`}
-      <section id="sol"${shown ? "" : " hidden"} style="margin-top:26px"><h2 class="h-md" style="margin-bottom:14px">Разбор</h2><div class="steps blocks">${renderBlocks(t.sol)}</div>${vizFor("task", n).length ? `<div style="margin-top:22px;display:flex;flex-direction:column;gap:14px">${vizFor("task", n).slice(0, 2).map(vizBlock).join("")}</div>` : ""}${schemesFor("task", n).length ? `<h3 class="h-sm" style="margin:22px 0 12px">Схема, чтобы запомнить</h3>${schemeStrip(schemesFor("task", n).slice(0, 2))}` : ""}</section>${t.isCase ? CWS_CLOSE : ""}
+      <section id="sol"${shown ? "" : " hidden"} style="margin-top:26px"><h2 class="h-md" style="margin-bottom:14px">Разбор</h2><div class="steps blocks">${solHTML}</div>${vizFor("task", n).length ? `<div style="margin-top:22px;display:flex;flex-direction:column;gap:14px">${vizFor("task", n).slice(0, 2).map(vizBlock).join("")}</div>` : ""}${schemesFor("task", n).length ? `<h3 class="h-sm" style="margin:22px 0 12px">Схема, чтобы запомнить</h3>${schemeStrip(schemesFor("task", n).slice(0, 2))}` : ""}</section>${t.isCase ? CWS_CLOSE : ""}${tWide}
       <div style="display:flex;justify-content:space-between;gap:8px;margin-top:26px">${n > 1 ? `<a class="pill" href="#/exam/${n - 1}">Задание ${n - 1}</a>` : "<span></span>"}${n < 22 ? `<a class="pill ink" href="#/exam/${n + 1}">Задание ${n + 1}</a>` : `<a class="pill ink" href="#/mock">Пробная контрольная</a>`}</div>
     </div><aside class="exam-side">
       <div class="photo-note ${photoCl}" id="photo-note"${shown ? "" : " hidden"}><span class="pen">${pen}</span><div><b style="font-weight:550;display:block;margin-bottom:2px">Пометки на фото</b>${md(t.photo.text)}</div></div>${shown ? "" : `<div class="photo-note" id="photo-lock"><span class="pen">?</span><div><b style="font-weight:550;display:block;margin-bottom:2px">Пометки на фото</b>Откроются после твоего ответа или разбора: в них видно, что обвели на контрольной.</div></div>`}
@@ -1351,7 +1358,7 @@
 
   /* ---------- Поиск и настройки ---------- */
   let searchIndex = null;
-  const blockText = (b) => { switch (b.t) { case "def": return `${b.term} ${b.text}`; case "list": return b.items ? b.items.join(" ") : b.groups.flatMap((g) => [g.h, ...g.items]).join(" "); case "table": return [...b.head, ...b.rows.flat()].join(" "); case "example": return [b.title, b.given, ...b.steps, b.result].join(" "); case "formula": return `${b.text} ${b.note || ""}`; case "entries": return b.rows.map((r) => r.op).join(" "); case "eq": return b.rows.map((r) => r.op).join(" "); case "tacc": case "tdouble": return b.title || ""; case "viz": return ""; default: return b.text || ""; } };
+  const blockText = (b) => { switch (b.t) { case "def": return `${b.term} ${b.text}`; case "list": return b.items ? b.items.join(" ") : b.groups.flatMap((g) => [g.h, ...g.items]).join(" "); case "table": return [...b.head, ...b.rows.flat()].join(" "); case "example": return [b.title, b.given, ...b.steps, b.result].join(" "); case "formula": return `${b.text} ${b.note || ""}`; case "entries": return b.rows.map((r) => r.op).join(" "); case "eq": return b.rows.map((r) => r.op).join(" "); case "tacc": case "tdouble": case "tbal": return b.title || ""; case "viz": case "tcase": return ""; default: return b.text || ""; } };
   function buildIndex() {
     searchIndex = [];
     LESSONS.forEach((l) => (l.sections || []).forEach((s, si) => searchIndex.push({ title: l.title, sub: s.title, text: (s.blocks || []).map(blockText).join(" ").replace(/\*\*/g, "").replace(/\n(- )?/g, " "), link: `l/${l.id}`, scroll: `sec-${si}` })));
@@ -1616,7 +1623,8 @@
     else if (act === "wheel") { const n = +ac.dataset.n; location.hash = `#/exam/${n}`; }
     else if (act === "exam-list") { e.preventDefault(); const m = $("#side-map"); if (m) m.scrollIntoView({ behavior: "smooth", block: "center" }); }
     else if (act === "scroll-sol") { const s = $("#sol"); if (s && !s.hidden) s.scrollIntoView({ behavior: "smooth" }); else { const t = $("#exam-try"); if (t) t.scrollIntoView({ behavior: "smooth", block: "center" }); } }
-    else if (act === "show-sol") { $("#sol").hidden = false; unlockPhoto(); ac.remove(); $("#sol").scrollIntoView({ behavior: "smooth" }); }
+    else if (act === "scroll-tcase") { const x = $("#sol-t"); if (x) x.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    else if (act === "show-sol") { $("#sol").hidden = false; if ($("#sol-t")) $("#sol-t").hidden = false; unlockPhoto(); ac.remove(); $("#sol").scrollIntoView({ behavior: "smooth" }); }
     else if (act === "mock-start") { const mode = ac.dataset.mode, min = +($(mode === "orig" ? "#mock-min-a" : "#mock-min-b").value); S.mock.active = { start: Date.now(), minutes: min, mode, seed: Math.floor(Math.random() * 1e9) + 1, answers: {} }; save(); route(); }
     else if (act === "mock-submit") { submitMock(false); }
     else if (act && act.startsWith("w-")) wAct(act, ac);
