@@ -842,7 +842,7 @@
     const ops = rpOps(); let li = 0;
     const body = cond.map((b) => {
       if (b.t === "p") return `<p class="rp-p">${md(b.text)}</p>`;
-      if (b.t === "table") return `<div class="rp-osv"><table><thead><tr>${b.head.map((h, i) => `<th class="${i > 1 ? "r" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${b.rows.map((r) => `<tr data-acc="${esc(String(r[0]).trim())}">${r.map((c, i) => `<td class="${i > 1 ? "r" : ""}">${md(String(c))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+      if (b.t === "table") return `<div class="rp-osv"><table><thead><tr>${b.head.map((h, i) => `<th class="${i >= b.head.length - 2 ? "r" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${b.rows.map((r) => `<tr data-acc="${esc(String(r[0]).trim().toLowerCase())}">${r.map((c, i) => `<td class="${i >= b.head.length - 2 ? "r" : ""}">${md(String(c))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
       if (b.t === "list") return `<ol class="rp-ops">${b.items.map((it) => { const i = li++, k = RP.opKeys[i] || "op" + i, done = !!ops[k]; return `<li data-op="${k}" class="${done ? "done" : ""}"><button class="op-chk" data-act="rp-op" data-op="${k}" aria-pressed="${done}" aria-label="Пункт ${i + 1} учтён">${ICON.check}</button><span class="op-n">${i + 1}</span><span class="op-t">${md(it)}</span></li>`; }).join("")}</ol>`;
       return renderBlocks([b]);
     }).join("");
@@ -881,7 +881,7 @@
       else st = `<p class="rp-st bad">Пока неверно${rpIsExpr(raw) ? ` (${esc(raw)} = ${G.fmt(v)})` : ""}. Посмотри, откуда берётся число.</p>`;
     }
     const where = [];
-    if (r.osv && r.osv.length) where.push(`${r.osv.length > 1 ? "счета" : "счёт"} ${r.osv.join(", ")}`);
+    if (r.osv && r.osv.length) where.push(`в ведомости: ${r.osv.join(", ")}`);
     const opsN = (r.ops || []).map((k) => RP.opKeys.indexOf(k) + 1).filter((x) => x > 0);
     if (opsN.length) where.push(`${opsN.length > 1 ? "пункты" : "пункт"} ${opsN.join(", ")}`);
     if (r.f) where.push("строки этого отчёта выше");
@@ -914,7 +914,7 @@
     $$(".rp-host .hl").forEach((x) => x.classList.remove("hl"));
     if (!r || !box || (!mini && !rpLearn())) return;
     (r.ops || []).forEach((k) => { const el = $(`li[data-op="${k}"]`, box); if (el) el.classList.add("hl"); });
-    (r.osv || []).forEach((a) => { const el = $(`tr[data-acc="${a}"]`, box); if (el) el.classList.add("hl"); });
+    (r.osv || []).forEach((a) => box.querySelectorAll("tr[data-acc]").forEach((el) => { if (el.dataset.acc.includes(a.toLowerCase())) el.classList.add("hl"); }));
     if (mini) return;
     const first = $("#rp-cond .hl");
     if (!box || !first || (rpNarrow() && !$("#rp-side.open"))) return;
@@ -1049,8 +1049,8 @@
     blocks.forEach((b) => b.items.forEach(({ r }) => { (r.ops || []).forEach((o) => ops.add(o)); (r.osv || []).forEach((a) => osv.add(a)); }));
     const cond = EX.tasks[17].cond, list = cond.find((b) => b.t === "list"), table = cond.find((b) => b.t === "table");
     const big = blocks.some((b) => b.all) || ops.size > 4;
-    const osvRows = table.rows.filter((r) => big || osv.has(String(r[0]).trim()));
-    const osvHTML = osvRows.length ? `<div class="rp-osv"><table><thead><tr>${table.head.map((h, i) => `<th class="${i > 1 ? "r" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${osvRows.map((r) => `<tr data-acc="${esc(String(r[0]).trim())}">${r.map((c, i) => `<td class="${i > 1 ? "r" : ""}">${md(String(c))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : "";
+    const osvRows = table.rows.filter((r) => big || [...osv].some((a) => String(r[0]).toLowerCase().includes(a.toLowerCase())));
+    const osvHTML = osvRows.length ? `<div class="rp-osv"><table><thead><tr>${table.head.map((h, i) => `<th class="${i >= table.head.length - 2 ? "r" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${osvRows.map((r) => `<tr data-acc="${esc(String(r[0]).trim().toLowerCase())}">${r.map((c, i) => `<td class="${i >= table.head.length - 2 ? "r" : ""}">${md(String(c))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : "";
     const opsHTML = `<ol class="rp-ops plain">${list.items.map((it, i) => { const k = RP.opKeys[i]; return big || ops.has(k) ? `<li data-op="${k}"><span class="op-n">${i + 1}</span><span class="op-t">${md(it)}</span></li>` : ""; }).join("")}</ol>`;
     const side = window.matchMedia("(min-width:1081px)").matches;
     const condHTML = big ? `<details class="rp-mini-cond"${side ? " open" : ""}><summary>Условие задачи с контрольной <span class="tiny muted">ведомость и операции за год</span></summary>${osvHTML}${opsHTML}</details>`

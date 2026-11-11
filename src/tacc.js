@@ -137,7 +137,7 @@ window.TACC = (function () {
   /* ---------- Сквозная задача 18–22 на Т-счетах: проводки строятся из чисел задачи ---------- */
   function caseModel(s) {
     const p = s.p, A = {}, ops = [], order = [];
-    const acc = (id, num, name, kind, open, g) => { A[id] = { id, num, name, kind, open, g, dt: { v: [], ops: [] }, kt: { v: [], ops: [] } }; order.push(id); };
+    const acc = (id, num, name, kind, open, g) => { A[id] = { id, num: "", name, kind, open, g, dt: { v: [], ops: [] }, kt: { v: [], ops: [] } }; order.push(id); };
     acc("01", "01", "Основные средства", "А", p.os, 0);
     acc("02", "02", "Амортизация ОС", "КА", p.am, 0);
     acc("41", "41", "Товары", "А", p.zap, 0);
@@ -187,9 +187,9 @@ window.TACC = (function () {
     op("75", "51", s.divPaid, "Выплачены дивиденды");
     op("99", "68p", p.tax, "Начислен налог на прибыль");
     op("68p", "51", s.taxPaid, "Уплачен налог на прибыль");
-    if (s.salesP >= 0) op("90", "99", s.salesP, "Прибыль от продаж закрыта на 99"); else op("99", "90", -s.salesP, "Убыток от продаж закрыт на 99");
+    if (s.salesP >= 0) op("90", "99", s.salesP, "Прибыль от продаж закрыта на прибыль года"); else op("99", "90", -s.salesP, "Убыток от продаж закрыт на прибыль года");
     const oth = p.bondAcc - p.loanAcc;
-    if (oth >= 0) op("91", "99", oth, "Сальдо прочих доходов закрыто на 99"); else op("99", "91", -oth, "Сальдо прочих расходов закрыто на 99");
+    if (oth >= 0) op("91", "99", oth, "Сальдо прочих доходов закрыто на прибыль года"); else op("99", "91", -oth, "Сальдо прочих расходов закрыто на прибыль года");
     return { A, ops, order };
   }
   /* Строки баланса из сальдо счетов: на начало (Сн) и на конец (Ск) */
@@ -206,16 +206,16 @@ window.TACC = (function () {
     return { start: line(false), end: line(true) };
   }
   function caseBlock(s, opt = {}) {
-    const M = caseModel(s), B = caseBalance(M), A = M.A, num = (id) => A[id].num;
-    const T = (id) => { const a = A[id]; return tHTML({ ...a, open: a.open ? a.open : undefined, close: a.kind === "С" ? "Сальдо нет: закрыт на 99" : undefined, noSub: true }); };
+    const M = caseModel(s), B = caseBalance(M), A = M.A, num = (id) => A[id].name;
+    const T = (id) => { const a = A[id]; return tHTML({ ...a, open: a.open ? a.open : undefined, close: a.kind === "С" ? "Сальдо нет: закрыт на прибыль года" : undefined, noSub: true }); };
     const grp = (g, title) => `<h4 class="tc-g">${title}</h4><div class="tp-grid tc-grid">${M.order.filter((id) => A[id].g === g).map(T).join("")}</div>`;
     const cs = M.order.map((id) => calc(A[id])), sD = sum(cs.map((c) => c.od)), sK = sum(cs.map((c) => c.ok));
     const R = (l, from, k, b) => `<tr${b ? ' class="tc-tot"' : ""}><td>${b ? `<b>${l}</b>` : l}</td><td>${from}</td><td class="r">${b ? `<b>${fmt(B.start[k])}</b>` : fmt(B.start[k])}</td><td class="r">${b ? `<b>${fmt(B.end[k])}</b>` : fmt(B.end[k])}</td></tr>`;
-    const kzFrom = ["60.01", "70", "68", "69", "68.04", ...(A["75"] ? ["75"] : [])].join(" + ");
+    const kzFrom = ["поставщики", "зарплата", "НДФЛ", "взносы", "налог на прибыль", ...(A["75"] ? ["участники"] : [])].join(" + ");
     const check = `<h4 class="tc-g">Сверка: из сальдо счетов в баланс</h4><div class="tbl-wrap"><table class="tc-tbl"><thead><tr><th>Строка баланса</th><th>Сальдо каких счетов</th><th class="r">На начало</th><th class="r">На конец</th></tr></thead><tbody>
-      ${R("Основные средства", "01 − 02", "os")}${R("Запасы", "41", "zap")}${R("Дебиторская задолженность", "62.01 + 76 + 76", "dz")}${R("Финансовые вложения", "58", "fv")}${R("Денежные средства", "51", "ds")}${R("Баланс (актив)", "", "total", 1)}
-      ${R("Уставный капитал", "80", "uk")}${R("Нераспределённая прибыль", "84 и 99 вместе", "nrp")}${R("Заёмные средства", "66.01", "zs")}${R("Кредиторская задолженность", kzFrom, "kz")}${R("Баланс (пассив)", "", "pas", 1)}</tbody></table></div>
-      <p class="tc-sum">Обороты по дебету всех счетов ${fmt(sD)} ${sD === sK ? "=" : "≠"} обороты по кредиту ${fmt(sK)}: каждая сумма записана дважды. 90 и 91 закрыты на 99, а 99 показывается в балансе вместе с 84.</p>`;
+      ${R("Основные средства", "основные средства − амортизация", "os")}${R("Запасы", "товары", "zap")}${R("Дебиторская задолженность", "покупатели + проценты к получению + аренда", "dz")}${R("Финансовые вложения", "финансовые вложения", "fv")}${R("Денежные средства", "расчётные счета", "ds")}${R("Баланс (актив)", "", "total", 1)}
+      ${R("Уставный капитал", "уставный капитал", "uk")}${R("Нераспределённая прибыль", "прошлых лет + прибыль года", "nrp")}${R("Заёмные средства", "кредит", "zs")}${R("Кредиторская задолженность", kzFrom, "kz")}${R("Баланс (пассив)", "", "pas", 1)}</tbody></table></div>
+      <p class="tc-sum">Обороты по дебету всех счетов ${fmt(sD)} ${sD === sK ? "=" : "≠"} обороты по кредиту ${fmt(sK)}: каждая сумма записана дважды. Продажи и прочие доходы и расходы закрываются на прибыль года, а она показывается в балансе вместе с нераспределённой прибылью.</p>`;
     const list = M.ops.map((o) => `<li><button type="button" class="tc-op" data-tcop="${o.n}" aria-pressed="false"><i class="tt-op">${o.n}</i><span class="tc-t">${esc(o.t)}</span><span class="tc-e">Дт ${esc(num(o.dt))}, Кт ${esc(num(o.kt))}</span><b>${fmt(o.v)}</b></button></li>`).join("");
     return `<figure class="tacc tcase"><figcaption><span class="tag">Схема</span><b>${txt(opt.title || "Вся задача на Т-счетах")}</b></figcaption>
       <p class="td-lead">Сальдо на начало взяты из ОСВ. Каждая операция года записана дважды, по дебету одного счёта и по кредиту другого. Номер у суммы на счёте совпадает с номером в списке. Сальдо на конец сразу дают баланс на конец года.</p>
