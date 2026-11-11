@@ -441,7 +441,8 @@
   /* ---------- План по дням до контрольной (src/dayplan.js) ---------- */
   const DP = window.DAYPLAN || null;
   const localDay = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-  const dpActive = () => !!(DP && localDay() <= DP.exam);
+  /* План не гаснет, пока не прошла и дата из плана, и дата контрольной, которую поставили в настройках */
+  const dpActive = () => !!(DP && localDay() <= (S.examDate > DP.exam ? S.examDate : DP.exam));
   const dpDate = (s, o) => new Date(s + "T12:00:00").toLocaleDateString("ru-RU", o);
   const DP_KIND = { lesson: "Урок", exam: "Контрольная", bank: "Банк", train: "Тренажёр", case: "Тренажёр", variant: "Вариант", mistakes: "Ошибки", open: "Своими словами", notes: "Спорные места", mu: "Методичка", cheat: "Шпаргалка", cards: "Карточки", reports: "Бланки", schemes: "Схемы" };
   const varDone = (v) => S.mock.history.some((r) => r.mode === "var" && r.v === v);
